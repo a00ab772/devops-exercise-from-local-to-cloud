@@ -61,4 +61,4 @@ After you test it you can destroy the Vagrant environment to free up system reso
 
 Overall experience is that, the automated provisioning of the project has been a great success, allowing for a quick and efficient setup of the local development environment. The use of Vagrant and the provided provisioning scripts has streamlined the process, reducing the time and effort required to set up the environment.
 
-This is the baseline for next step, which is to deploy the project in the cloud, which will allow for more efficient testing and development in a production-like environment.
+This is the baseline for next step, [AWS Manual Provisioning](./aws/Manual_provisioning/README.md), which will give us a better overview of the required steps to deploy a web application in AWS cloud.
