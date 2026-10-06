@@ -1,0 +1,97 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="Arquitectura DevOps" id="architecture_vpro">
+    <mxGraphModel dx="1422" dy="794" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- Users & Client Sources -->
+        <mxCell id="user1" value="User" style="shape=actor;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="80" width="40" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="users" value="Users" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;" vertex="1" parent="1">
+          <mxGeometry x="60" y="180" width="40" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="client" value="Client / CLI" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="40" y="300" width="80" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- Load Balancer -->
+        <mxCell id="lb" value="Load Balancer" style="shape=hexagon;perimeter=hexagonPerimeter2;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="240" y="190" width="100" height="80" as="geometry" />
+        </mxCell>
+
+        <!-- NGINX Server Box -->
+        <mxCell id="nginx_box" value="NGINX" style="swimlane;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;" vertex="1" parent="1">
+          <mxGeometry x="400" y="60" width="140" height="280" as="geometry" />
+        </mxCell>
+        <mxCell id="nginx_logo" value="NGINX" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=1;fontSize=16;fontStyle=1;fontColor=#008000;" vertex="1" parent="nginx_box">
+          <mxGeometry x="20" y="120" width="100" height="40" as="geometry" />
+        </mxCell>
+
+        <!-- Tomcat / App Server Box -->
+        <mxCell id="tomcat_box" value="App Server (Tomcat)" style="swimlane;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="660" y="60" width="160" height="340" as="geometry" />
+        </mxCell>
+        <mxCell id="tomcat_logo" value="Apache Tomcat" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="tomcat_box">
+          <mxGeometry x="20" y="130" width="120" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- NFS Server -->
+        <mxCell id="nfs" value="NFS Server" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1">
+          <mxGeometry x="900" y="210" width="70" height="80" as="geometry" />
+        </mxCell>
+
+        <!-- Memcached Cluster Box -->
+        <mxCell id="memcached_box" value="Memcached" style="swimlane;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="320" y="520" width="240" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="mem1" value="Memcached 1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#95T250;strokeColor=#2d7014;fillColor=#d4e1f5;" vertex="1" parent="memcached_box">
+          <mxGeometry x="20" y="50" width="80" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="mem2" value="Memcached 2" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d4e1f5;strokeColor=#2d7014;" vertex="1" parent="memcached_box">
+          <mxGeometry x="140" y="50" width="80" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- RabbitMQ -->
+        <mxCell id="rabbitmq" value="RabbitMQ" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="670" y="550" width="120" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- MySQL Database -->
+        <mxCell id="mysql" value="MySQL Server" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="480" y="720" width="100" height="80" as="geometry" />
+        </mxCell>
+
+        <!-- Connections / Arrows -->
+        <mxCell id="e1" edge="1" parent="1" source="user1" target="lb">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" edge="1" parent="1" source="users" target="lb">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3" edge="1" parent="1" source="client" target="lb">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e4" edge="1" parent="1" source="lb" target="nginx_box">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e5" edge="1" parent="1" source="nginx_box" target="tomcat_box">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e6" edge="1" parent="1" source="tomcat_box" target="nfs">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e7" edge="1" parent="1" source="tomcat_box" target="memcached_box">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e8" edge="1" parent="1" source="tomcat_box" target="rabbitmq">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e9" edge="1" parent="1" source="memcached_box" target="mysql">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

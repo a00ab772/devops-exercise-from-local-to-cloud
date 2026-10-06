@@ -1,0 +1,5 @@
+/home/vagrant/devops-exercise-from-local-to-cloud/src/test/java/com/arturo/account/controllerTest/SampleTest.java
+/home/vagrant/devops-exercise-from-local-to-cloud/src/test/java/com/arturo/account/controllerTest/UserControllerTest.java
+/home/vagrant/devops-exercise-from-local-to-cloud/src/test/java/com/arturo/account/modelTest/RoleTest.java
+/home/vagrant/devops-exercise-from-local-to-cloud/src/test/java/com/arturo/account/modelTest/UserTest.java
+/home/vagrant/devops-exercise-from-local-to-cloud/src/test/java/com/arturo/account/setup/StandaloneMvcTestViewResolver.java
