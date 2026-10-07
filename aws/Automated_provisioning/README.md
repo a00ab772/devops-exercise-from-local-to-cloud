@@ -262,7 +262,7 @@ $ aws ec2 authorize-security-group-ingress \
     --protocol tcp \
     --port 3306 \
     --cidr $(curl -s ifconfig.me)/32 \
-    --region us-east-1
+    --region $AWS_REGION
 {
     "Return": true,
     "SecurityGroupRules": [
@@ -524,7 +524,9 @@ First, we create the IAM Role & Instance Profile:
 * Create the IAM Role (trust policy for EC2)
 
 ```bash
-aws iam create-role \
+user@DESKTOP-SCNMK3I UCRT64 ~/Documents/devops-exercise-from-local-to-cloud/aws (main)
+Wed Oct 07 16:12:59
+$ aws iam create-role \
     --role-name vprofile-eb-ec2-role \
     --assume-role-policy-document '{
       "Version": "2012-10-17",
@@ -534,60 +536,186 @@ aws iam create-role \
         "Action": "sts:AssumeRole"
       }]
     }' \
-    --region us-east-1
+    --region $AWS_REGION
+{
+    "Role": {
+        "Path": "/",
+        "RoleName": "vprofile-eb-ec2-role",
+        "RoleId": "AROAWI*******QWP**NN2S",
+        "Arn": "arn:aws:iam::4***********5:role/vprofile-eb-ec2-role",
+        "CreateDate": "2026-10-07T14:13:07+00:00",
+        "AssumeRolePolicyDocument": {
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Effect": "Allow",
+                    "Principal": {
+                        "Service": "ec2.amazonaws.com"
+                    },
+                    "Action": "sts:AssumeRole"
+                }
+            ]
+        }
+    }
+}
 ```
 
-Run in CloudShell
-1b. Attach Minimum Required Managed Policy (Web Tier only)
-aws iam attach-role-policy \
+* Attach Minimum Required Managed Policy (Web Tier only)
+
+```bash
+user@DESKTOP-SCNMK3I UCRT64 ~/Documents/devops-exercise-from-local-to-cloud/aws (main)
+Wed Oct 07 16:13:06
+$ aws iam attach-role-policy \
 --role-name vprofile-eb-ec2-role \
 --policy-arn arn:aws:iam::aws:policy/AWSElasticBeanstalkWebTier
+```
 
-Run in CloudShell
 This policy grants only what's needed: read app versions from S3, write logs to S3, and report health to Elastic Beanstalk.
 
-1c. Create the Instance Profile and attach the Role
-aws iam create-instance-profile \
---instance-profile-name vprofile-eb-instance-profile
+* Create the Instance Profile and attach the Role
 
-aws iam add-role-to-instance-profile \
+```bash
+user@DESKTOP-SCNMK3I UCRT64 ~/Documents/devops-exercise-from-local-to-cloud/aws (main)
+Wed Oct 07 16:13:39
+$ aws iam create-instance-profile \
+--instance-profile-name vprofile-eb-instance-profile
+{
+    "InstanceProfile": {
+        "Path": "/",
+        "InstanceProfileName": "vprofile-eb-instance-profile",
+        "InstanceProfileId": "AIP******************4V",
+        "Arn": "arn:aws:iam::4***********5:instance-profile/vprofile-eb-instance-profile",
+        "CreateDate": "2026-10-07T14:14:30+00:00",
+        "Roles": []
+    }
+}
+```
+
+```bash
+user@DESKTOP-SCNMK3I UCRT64 ~/Documents/devops-exercise-from-local-to-cloud/aws (main)
+Wed Oct 07 16:14:29
+$ aws iam add-role-to-instance-profile \
 --instance-profile-name vprofile-eb-instance-profile \
 --role-name vprofile-eb-ec2-role
+```
 
-Run in CloudShell
-Step 2 — Create the Elastic Beanstalk Application
-aws elasticbeanstalk create-application \
---application-name vprofile-web-app \
+* Create the Elastic Beanstalk Application
+
+```bash
+user@DESKTOP-SCNMK3I UCRT64 ~/Documents/devops-exercise-from-local-to-cloud/aws (main)
+Wed Oct 07 16:14:59
+$ EBS_APPLICATION_NAME="vprofile-web-app"
+
+user@DESKTOP-SCNMK3I UCRT64 ~/Documents/devops-exercise-from-local-to-cloud/aws (main)
+Wed Oct 07 16:14:59
+$ aws elasticbeanstalk create-application \
+--application-name $EBS_APPLICATION_NAME \
 --description "Vprofile Tomcat Web Application" \
---region us-east-1
+--region $AWS_REGION
+{
+    "Application": {
+        "ApplicationArn": "arn:aws:elasticbeanstalk:us-east-1:4***********5:application/vprofile-web-app",
+        "ApplicationName": "vprofile-web-app",
+        "Description": "Vprofile Tomcat Web Application",
+        "DateCreated": "2026-10-07T14:16:16.369000+00:00",
+        "DateUpdated": "2026-10-07T14:16:16.369000+00:00",
+        "ConfigurationTemplates": [],
+        "ResourceLifecycleConfig": {
+            "VersionLifecycleConfig": {
+                "MaxCountRule": {
+                    "Enabled": false,
+                    "MaxCount": 200,
+                    "DeleteSourceFromS3": false
+                },
+                "MaxAgeRule": {
+                    "Enabled": false,
+                    "MaxAgeInDays": 180,
+                    "DeleteSourceFromS3": false
+                }
+            }
+        }
+    }
+}
+```
+This is how the ElasticBeanstalk application looks like in the UI:
 
-Run in CloudShell
-Step 3 — Create the Environment (Free Tier — Single Instance, t3.micro)
-aws elasticbeanstalk create-environment \
---application-name vprofile-web-app \
---environment-name vprofile-web-env \
---solution-stack-name "64bit Amazon Linux 2023 v5.14.9 running Tomcat 10 Corretto 17" \
+![ebs_application](images/ebs_application.png)
+
+* Create the Environment (Free Tier — Single Instance, t3.micro)
+
+EBS_ENVIRONMENT_NAME="vprofile-web-env"
+EBS_STACK_NAME="64bit Amazon Linux 2023 v5.14.9 running Tomcat 10 Corretto 17"
+
+```bash
+user@DESKTOP-SCNMK3I UCRT64 ~/Documents/devops-exercise-from-local-to-cloud/aws (main)
+Wed Oct 07 16:24:09
+$ EBS_ENVIRONMENT_NAME="vprofile-web-env"
+EBS_STACK_NAME="64bit Amazon Linux 2023 v5.14.9 running Tomcat 10 Corretto 17"
+
+user@DESKTOP-SCNMK3I UCRT64 ~/Documents/devops-exercise-from-local-to-cloud/aws (main)
+Wed Oct 07 16:24:50
+$ aws elasticbeanstalk create-environment \
+--application-name $EBS_APPLICATION_NAME \
+--environment-name $EBS_ENVIRONMENT_NAME \
+--solution-stack-name "$EBS_STACK_NAME" \
 --option-settings \
 Namespace=aws:autoscaling:launchconfiguration,OptionName=IamInstanceProfile,Value=vprofile-eb-instance-profile \
 Namespace=aws:autoscaling:launchconfiguration,OptionName=InstanceType,Value=t3.micro \
 Namespace=aws:elasticbeanstalk:environment,OptionName=EnvironmentType,Value=SingleInstance \
---region us-east-1
+--region $AWS_REGION
+{
+    "EnvironmentName": "vprofile-web-env",
+    "EnvironmentId": "e-k********et",
+    "ApplicationName": "vprofile-web-app",
+    "SolutionStackName": "64bit Amazon Linux 2023 v5.14.9 running Tomcat 10 Corretto 17",
+    "PlatformArn": "arn:aws:elasticbeanstalk:us-east-1::platform/Tomcat 10 with Corretto 17 running on 64bit Amazon Linux 2023/5.14.9",
+    "DateCreated": "2026-10-07T14:25:00.442000+00:00",
+    "DateUpdated": "2026-10-07T14:25:00.442000+00:00",
+    "Status": "Launching",
+    "Health": "Grey",
+    "Tier": {
+        "Name": "WebServer",
+        "Type": "Standard",
+        "Version": "1.0"
+    },
+    "EnvironmentArn": "arn:aws:elasticbeanstalk:us-east-1:4***********5:environment/vprofile-web-app/vprofile-web-env"
+}
+```
 
-Run in CloudShell
-Wait for it to be ready
-aws elasticbeanstalk wait environment-updated \
---application-name vprofile-web-app \
---environment-names vprofile-web-env \
---region us-east-1
+* Wait for it to be ready
 
-Run in CloudShell
-Step 4 — Get Your Application URL
-aws elasticbeanstalk describe-environments \
---application-name vprofile-web-app \
---environment-names vprofile-web-env \
+```bash
+user@DESKTOP-SCNMK3I UCRT64 ~/Documents/devops-exercise-from-local-to-cloud/aws (main)
+Wed Oct 07 16:25:31
+$ aws elasticbeanstalk wait environment-updated \
+--application-name $EBS_APPLICATION_NAME \
+--environment-names $EBS_ENVIRONMENT_NAME \
+--region $AWS_REGION
+
+user@DESKTOP-SCNMK3I UCRT64 ~/Documents/devops-exercise-from-local-to-cloud/aws (main)
+Wed Oct 07 16:27:58
+$
+```
+
+![ebs_environment](images/ebs_environment.png)
+
+* Get Your Application URL
+
+```bash
+user@DESKTOP-SCNMK3I UCRT64 ~/Documents/devops-exercise-from-local-to-cloud/aws (main)
+Wed Oct 07 16:27:58
+$ aws elasticbeanstalk describe-environments \
+--application-name $EBS_APPLICATION_NAME \
+--environment-names $EBS_ENVIRONMENT_NAME \
 --query "Environments[0].CNAME" \
 --output text \
---region us-east-1
+--region $AWS_REGION
+vprofile-web-env.eba-sk*****2.us-east-1.elasticbeanstalk.com
+```
+
+The application is accessible:
+
+![ebs_url](images/ebs_url.png)
 
 
 ## Update SG of backend to allow access from Beanstalk SG
