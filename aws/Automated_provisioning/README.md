@@ -722,6 +722,121 @@ The application is accessible:
 
 The backend services (RDS, Elasticache and ActiveMQ) are in the same VPC, so they can communicate with each other using their private IP addresses. However, the Beanstalk environment is in a different VPC, so we need to allow access from the Beanstalk SG to the backend SG.
 
+Get the Elastic Beanstalk security group id:
+
+```bash
+user@DESKTOP-SCNMK3I UCRT64 ~/Documents/Udemy/DevOpsWithAI/20_vm-Automatically/62-vprofile-project-local/devops-exercise-from-local-to-cloud/aws (main)
+Wed Oct 07 16:53:03
+$ EBS_SG_ID=$(aws ec2 describe-security-groups \
+    --filters "Name=tag:elasticbeanstalk:environment-name,Values=$EBS_ENVIRONMENT_NAME" \
+    --query "SecurityGroups[0].GroupId" \
+    --output text \
+    --region $AWS_REGION)
+```
+
+Authorize the Elastic Beanstalk to access to the RDS service in the `vprofile-backend-sg` Security Group:
+
+```bash 
+user@DESKTOP-SCNMK3I UCRT64 ~/Documents/Udemy/DevOpsWithAI/20_vm-Automatically/62-vprofile-project-local/devops-exercise-from-local-to-cloud/aws (main)
+Wed Oct 07 16:56:28
+$ aws ec2 authorize-security-group-ingress \
+    --group-id $SG_ID \
+    --description "Allow MySQL access from Beanstalk web tier" \
+    --protocol tcp \
+    --port 3306 \
+    --source-group $EBS_SG_ID \
+    --region $AWS_REGION
+{
+    "Return": true,
+    "SecurityGroupRules": [
+        {
+            "SecurityGroupRuleId": "sgr-00f************601",
+            "GroupId": "sg-09fc**********95e",
+            "GroupOwnerId": "430********05",
+            "IsEgress": false,
+            "IpProtocol": "tcp",
+            "FromPort": 3306,
+            "ToPort": 3306,
+            "ReferencedGroupInfo": {
+                "GroupId": "sg-07f4************e20",
+                "UserId": "430********05"
+            },
+            "SecurityGroupRuleArn": "arn:aws:ec2:us-east-1:430********05:security-group-rule/sgr-00f************601"
+        }
+    ]
+}
+```
+
+Authorize the Elastic Beanstalk to access to the ElastiCache service in the `vprofile-backend-sg` Security Group:
+
+```bash
+user@DESKTOP-SCNMK3I UCRT64 ~/Documents/Udemy/DevOpsWithAI/20_vm-Automatically/62-vprofile-project-local/devops-exercise-from-local-to-cloud/aws (main)
+Wed Oct 07 16:58:12
+$ aws ec2 authorize-security-group-ingress \
+--group-id $SG_ID \
+--description "Allow ElastiCache access from Beanstalk web tier" \
+--protocol tcp \
+--port 11211 \
+--source-group $EBS_SG_ID \
+--region $AWS_REGION
+{
+    "Return": true,
+    "SecurityGroupRules": [
+        {
+            "SecurityGroupRuleId": "sgr-082************290",
+            "GroupId": "sg-09fc**********95e",
+            "GroupOwnerId": "430********05",
+            "IsEgress": false,
+            "IpProtocol": "tcp",
+            "FromPort": 11211,
+            "ToPort": 11211,
+            "ReferencedGroupInfo": {
+                "GroupId": "sg-07f4************e20",
+                "UserId": "430********05"
+            },
+            "SecurityGroupRuleArn": "arn:aws:ec2:us-east-1:430********05:security-group-rule/sgr-082************290"
+        }
+    ]
+}
+```
+
+
+Authorize the Elastic Beanstalk to access to the Amazon MQ service in the `vprofile-backend-sg` Security Group:
+
+```bash
+user@DESKTOP-SCNMK3I UCRT64 ~/Documents/Udemy/DevOpsWithAI/20_vm-Automatically/62-vprofile-project-local/devops-exercise-from-local-to-cloud/aws (main)
+Wed Oct 07 17:04:56
+$ aws ec2 authorize-security-group-ingress \
+--group-id $SG_ID \
+--protocol tcp \
+--description "Allow Amazon MQ access from Beanstalk web tier" \
+--port 5672 \
+--source-group $EBS_SG_ID \
+--region $AWS_REGION
+{
+    "Return": true,
+    "SecurityGroupRules": [
+        {
+            "SecurityGroupRuleId": "sgr-00**************c9",
+            "GroupId": "sg-09fc**********95e",
+            "GroupOwnerId": "430********05",
+            "IsEgress": false,
+            "IpProtocol": "tcp",
+            "FromPort": 5672,
+            "ToPort": 5672,
+            "ReferencedGroupInfo": {
+                "GroupId": "sg-07f4************e20",
+                "UserId": "430********05"
+            },
+            "SecurityGroupRuleArn": "arn:aws:ec2:us-east-1:430********05:security-group-rule/sgr-00**************c9"
+        }
+    ]
+}
+```
+
+![backend_sg_inbound_rules_allowing_beanstalk_access](images/backend_sg_inbound_rules_allowing_beanstalk_access.png)
+
+
 ## Update backend SG to allow internal traffic
 
 The backend services (RDS, Elasticache and ActiveMQ) are in the same VPC, so they can communicate with each other using their private IP addresses. However, the Beanstalk environment is in a different VPC, so we need to allow access from the Beanstalk SG to the backend SG.
