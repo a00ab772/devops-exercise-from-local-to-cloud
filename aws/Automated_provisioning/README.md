@@ -225,7 +225,7 @@ ERROR 2003 (HY000): Can't connect to MySQL server on 'vprofiledb.cg**********8ts
 Temporarily, we will modify the RDS instance to be publicly accessible, so we can connect to it using the endpoint:
 
 ```bash
-user@DESKTOP-SCNMK3I UCRT64 ~/Documents/Udemy/DevOpsWithAI/20_vm-Automatically/62-vprofile-project-local/devops-exercise-from-local-to-cloud (main)
+user@DESKTOP-SCNMK3I UCRT64 ~/Documents/devops-exercise-from-local-to-cloud (main)
 Wed Oct 07 14:41:23
 $ aws rds modify-db-instance \
     --db-instance-identifier "$DB_INSTANCE_NAME" \
@@ -247,7 +247,7 @@ $ aws rds modify-db-instance \
 Wait for the instance to be available:
 
 ```bash
-user@DESKTOP-SCNMK3I UCRT64 ~/Documents/Udemy/DevOpsWithAI/20_vm-Automatically/62-vprofile-project-local/devops-exercise-from-local-to-cloud (main)
+user@DESKTOP-SCNMK3I UCRT64 ~/Documents/devops-exercise-from-local-to-cloud (main)
 Wed Oct 07 14:43:15
 $ aws rds wait db-instance-available     --db-instance-identifier "$DB_INSTANCE_NAME"     --region "$AWS_REGION"
 ```
@@ -255,7 +255,7 @@ $ aws rds wait db-instance-available     --db-instance-identifier "$DB_INSTANCE_
 We will also add our IP to the Correct Security Group
 
 ```bash
-user@DESKTOP-SCNMK3I UCRT64 ~/Documents/Udemy/DevOpsWithAI/20_vm-Automatically/62-vprofile-project-local/devops-exercise-from-local-to-cloud (main)
+user@DESKTOP-SCNMK3I UCRT64 ~/Documents/devops-exercise-from-local-to-cloud (main)
 Wed Oct 07 15:01:08
 $ aws ec2 authorize-security-group-ingress \
     --group-id "sg-09f************95e" \
@@ -290,19 +290,19 @@ curl -o global-bundle.pem https://truststore.pki.rds.amazonaws.com/global/global
 And run the sql script:
 
 ```bash
-user@DESKTOP-SCNMK3I UCRT64 ~/Documents/Udemy/DevOpsWithAI/20_vm-Automatically/62-vprofile-project-local/devops-exercise-from-local-to-cloud (main)
+user@DESKTOP-SCNMK3I UCRT64 ~/Documents/devops-exercise-from-local-to-cloud (main)
 Wed Oct 07 15:08:00
 $ mysql -h vprofiledb.cg********sa.us-east-1.rds.amazonaws.com \
     -P 3306 -u admin -p \
     --ssl-mode=VERIFY_IDENTITY \
-    --ssl-ca=./global-bundle.pem < aws/Automated_provisioning/scripts/db_backup.sql
+    --ssl-ca=./global-bundle.pem < aws/db_backup.sql
 Enter password: ***********
 ```
 
 The script has been executed successfully, we can now make the RDS instance NON publicly accessible:
 
 ```bash
-user@DESKTOP-SCNMK3I UCRT64 ~/Documents/Udemy/DevOpsWithAI/20_vm-Automatically/62-vprofile-project-local/devops-exercise-from-local-to-cloud (main)
+user@DESKTOP-SCNMK3I UCRT64 ~/Documents/devops-exercise-from-local-to-cloud (main)
 Wed Oct 07 15:16:37
 $ aws rds modify-db-instance \
     --db-instance-identifier "$DB_INSTANCE_NAME" \
@@ -328,7 +328,7 @@ $ aws rds modify-db-instance \
 Wait for the instance to be available:
 
 ```bash
-user@DESKTOP-SCNMK3I UCRT64 ~/Documents/Udemy/DevOpsWithAI/20_vm-Automatically/62-vprofile-project-local/devops-exercise-from-local-to-cloud (main)
+user@DESKTOP-SCNMK3I UCRT64 ~/Documents/devops-exercise-from-local-to-cloud (main)
 Wed Oct 07 14:43:15
 $ aws rds wait db-instance-available     --db-instance-identifier "$DB_INSTANCE_NAME"     --region "$AWS_REGION"
 ```
@@ -336,7 +336,7 @@ $ aws rds wait db-instance-available     --db-instance-identifier "$DB_INSTANCE_
 We will also revoke our IP from the Security Group
 
 ```bash
-user@DESKTOP-SCNMK3I UCRT64 ~/Documents/Udemy/DevOpsWithAI/20_vm-Automatically/62-vprofile-project-local/devops-exercise-from-local-to-cloud (main)
+user@DESKTOP-SCNMK3I UCRT64 ~/Documents/devops-exercise-from-local-to-cloud (main)
 Wed Oct 07 15:19:08
 $ aws ec2 revoke-security-group-ingress \
     --group-id $SG_ID \
@@ -461,9 +461,9 @@ The AmazonMQ instance will be created with the cheapest possible tier, hence we 
 
 ```bash
 
-user@DESKTOP-SCNMK3I UCRT64 ~/Documents/Udemy/DevOpsWithAI/20_vm-Automatically/62-vprofile-project-local/devops-exercise-from-local-to-cloud/aws/Automated_provisioning/scripts (main)
+user@DESKTOP-SCNMK3I UCRT64 ~/Documents/devops-exercise-from-local-to-cloud/aws (main)
 Wed Oct 07 13:46:05
-$user@DESKTOP-SCNMK3I UCRT64 ~/Documents/Udemy/DevOpsWithAI/20_vm-Automatically/62-vprofile-project-local/devops-exercise-from-local-to-cloud/aws/Automated_provisioning/scripts (main)
+$user@DESKTOP-SCNMK3I UCRT64 ~/Documents/devops-exercise-from-local-to-cloud/aws (main)
 Wed Oct 07 13:49:06
 $ MQ_ENGINE_VERSION=$(aws mq describe-broker-engine-types \
     --engine-type ActiveMQ \
@@ -471,7 +471,7 @@ $ MQ_ENGINE_VERSION=$(aws mq describe-broker-engine-types \
     --query "BrokerEngineTypes[-1].EngineVersions[-1].Name" \
     --output text)
 
-user@DESKTOP-SCNMK3I UCRT64 ~/Documents/Udemy/DevOpsWithAI/20_vm-Automatically/62-vprofile-project-local/devops-exercise-from-local-to-cloud/aws/Automated_provisioning/scripts (main)
+user@DESKTOP-SCNMK3I UCRT64 ~/Documents/devops-exercise-from-local-to-cloud/aws (main)
 Wed Oct 07 13:50:08
 $ echo "MQ_ENGINE_VERSION:  $MQ_ENGINE_VERSION"
 MQ_ENGINE_VERSION:  5.18
@@ -510,10 +510,85 @@ At the same time, the configuration of the AmazonMQ instance will look like this
 
 ![active_mq_configuration](images/active_mq_configuration.png)
 
-## Create Beanstalk environment
-The Beanstalk environment will be created with the following configuration:
-* Tomcat 9.0 running on 64bit Amazon Linux 2
-* Nginx as a reverse proxy
+## Create Elastic Beanstalk Environment
+
+Deploy a Tomcat web application via Elastic Beanstalk utilizing the most cost-effective architecture available (aiming for AWS Free Tier eligibility):
+
+* **Platform**: Tomcat 9.0 running on 64bit Amazon Linux 2.
+* **Proxy**: Nginx configured as a reverse proxy.
+* **IAM Role**: Automatically provision and assign a dedicated service role with the principle of least privilege (minimum required permissions).
+* **Cost Optimization**: Configured as a single-instance environment to ensure the lowest possible cost, fitting within standard free-tier thresholds where applicable.
+
+First, we create the IAM Role & Instance Profile:
+
+* Create the IAM Role (trust policy for EC2)
+
+```bash
+aws iam create-role \
+    --role-name vprofile-eb-ec2-role \
+    --assume-role-policy-document '{
+      "Version": "2012-10-17",
+      "Statement": [{
+        "Effect": "Allow",
+        "Principal": { "Service": "ec2.amazonaws.com" },
+        "Action": "sts:AssumeRole"
+      }]
+    }' \
+    --region us-east-1
+```
+
+Run in CloudShell
+1b. Attach Minimum Required Managed Policy (Web Tier only)
+aws iam attach-role-policy \
+--role-name vprofile-eb-ec2-role \
+--policy-arn arn:aws:iam::aws:policy/AWSElasticBeanstalkWebTier
+
+Run in CloudShell
+This policy grants only what's needed: read app versions from S3, write logs to S3, and report health to Elastic Beanstalk.
+
+1c. Create the Instance Profile and attach the Role
+aws iam create-instance-profile \
+--instance-profile-name vprofile-eb-instance-profile
+
+aws iam add-role-to-instance-profile \
+--instance-profile-name vprofile-eb-instance-profile \
+--role-name vprofile-eb-ec2-role
+
+Run in CloudShell
+Step 2 — Create the Elastic Beanstalk Application
+aws elasticbeanstalk create-application \
+--application-name vprofile-web-app \
+--description "Vprofile Tomcat Web Application" \
+--region us-east-1
+
+Run in CloudShell
+Step 3 — Create the Environment (Free Tier — Single Instance, t3.micro)
+aws elasticbeanstalk create-environment \
+--application-name vprofile-web-app \
+--environment-name vprofile-web-env \
+--solution-stack-name "64bit Amazon Linux 2023 v5.14.9 running Tomcat 10 Corretto 17" \
+--option-settings \
+Namespace=aws:autoscaling:launchconfiguration,OptionName=IamInstanceProfile,Value=vprofile-eb-instance-profile \
+Namespace=aws:autoscaling:launchconfiguration,OptionName=InstanceType,Value=t3.micro \
+Namespace=aws:elasticbeanstalk:environment,OptionName=EnvironmentType,Value=SingleInstance \
+--region us-east-1
+
+Run in CloudShell
+Wait for it to be ready
+aws elasticbeanstalk wait environment-updated \
+--application-name vprofile-web-app \
+--environment-names vprofile-web-env \
+--region us-east-1
+
+Run in CloudShell
+Step 4 — Get Your Application URL
+aws elasticbeanstalk describe-environments \
+--application-name vprofile-web-app \
+--environment-names vprofile-web-env \
+--query "Environments[0].CNAME" \
+--output text \
+--region us-east-1
+
 
 ## Update SG of backend to allow access from Beanstalk SG
 
