@@ -168,7 +168,7 @@ Now we will create the RDS instance with the following configuration:
 ```bash
 user@DESKTOP-SCNMK3I UCRT64 ~/Documents/devops-exercise-from-local-to-cloud/aws (main)
 Wed Oct 07 10:54:51
-$ DB_INSTANCE_IDENTIFIER="vprofile-db-instance"
+$ DB_INSTANCE_NAME="vprofiledb"
 DB_INSTANCE_CLASS="db.t3.micro"
 DB_ENGINE="mysql"
 DB_USERNAME="admin"
@@ -220,6 +220,144 @@ Wed Oct 07 11:16:06
 $ mysql -h vprofiledb.cg**********8tsa.us-east-1.rds.amazonaws.com -P 3306 -u admin -p --ssl-mode=VERIFY_IDENTITY --ssl-ca=./global-bundle.pem
 Enter password: ***********
 ERROR 2003 (HY000): Can't connect to MySQL server on 'vprofiledb.cg**********8tsa.us-east-1.rds.amazonaws.com:3306' (10060)
+```
+
+Temporarily, we will modify the RDS instance to be publicly accessible, so we can connect to it using the endpoint:
+
+```bash
+user@DESKTOP-SCNMK3I UCRT64 ~/Documents/Udemy/DevOpsWithAI/20_vm-Automatically/62-vprofile-project-local/devops-exercise-from-local-to-cloud (main)
+Wed Oct 07 14:41:23
+$ aws rds modify-db-instance \
+    --db-instance-identifier "$DB_INSTANCE_NAME" \
+    --publicly-accessible \
+    --apply-immediately \
+    --region "$AWS_REGION"
+{
+    "DBInstance": {
+        "DBInstanceIdentifier": "vprofiledb",
+        "DBInstanceClass": "db.t3.micro",
+        "Engine": "mysql",
+        "DBInstanceStatus": "available",
+        "MasterUsername": "admin",
+        "DBName": "vprofilerdsrearch",
+        "Endpoint": {
+...
+```
+
+Wait for the instance to be available:
+
+```bash
+user@DESKTOP-SCNMK3I UCRT64 ~/Documents/Udemy/DevOpsWithAI/20_vm-Automatically/62-vprofile-project-local/devops-exercise-from-local-to-cloud (main)
+Wed Oct 07 14:43:15
+$ aws rds wait db-instance-available     --db-instance-identifier "$DB_INSTANCE_NAME"     --region "$AWS_REGION"
+```
+
+We will also add our IP to the Correct Security Group
+
+```bash
+user@DESKTOP-SCNMK3I UCRT64 ~/Documents/Udemy/DevOpsWithAI/20_vm-Automatically/62-vprofile-project-local/devops-exercise-from-local-to-cloud (main)
+Wed Oct 07 15:01:08
+$ aws ec2 authorize-security-group-ingress \
+    --group-id "sg-09f************95e" \
+    --protocol tcp \
+    --port 3306 \
+    --cidr $(curl -s ifconfig.me)/32 \
+    --region us-east-1
+{
+    "Return": true,
+    "SecurityGroupRules": [
+        {
+            "SecurityGroupRuleId": "sgr-071************4c6",
+            "GroupId": "sg-09f************95e",
+            "GroupOwnerId": "4************5",
+            "IsEgress": false,
+            "IpProtocol": "tcp",
+            "FromPort": 3306,
+            "ToPort": 3306,
+            "CidrIpv4": "*89.*6*.2**.132/32",
+            "SecurityGroupRuleArn": "arn:aws:ec2:us-east-1:4************5:security-group-rule/sgr-071************4c6"
+        }
+    ]
+}
+```
+
+Get the pem file:
+
+```bash
+curl -o global-bundle.pem https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem
+```
+
+And run the sql script:
+
+```bash
+user@DESKTOP-SCNMK3I UCRT64 ~/Documents/Udemy/DevOpsWithAI/20_vm-Automatically/62-vprofile-project-local/devops-exercise-from-local-to-cloud (main)
+Wed Oct 07 15:08:00
+$ mysql -h vprofiledb.cg********sa.us-east-1.rds.amazonaws.com \
+    -P 3306 -u admin -p \
+    --ssl-mode=VERIFY_IDENTITY \
+    --ssl-ca=./global-bundle.pem < aws/Automated_provisioning/scripts/db_backup.sql
+Enter password: ***********
+```
+
+The script has been executed successfully, we can now make the RDS instance NON publicly accessible:
+
+```bash
+user@DESKTOP-SCNMK3I UCRT64 ~/Documents/Udemy/DevOpsWithAI/20_vm-Automatically/62-vprofile-project-local/devops-exercise-from-local-to-cloud (main)
+Wed Oct 07 15:16:37
+$ aws rds modify-db-instance \
+    --db-instance-identifier "$DB_INSTANCE_NAME" \
+    --no-publicly-accessible \
+    --apply-immediately \
+    --region "$AWS_REGION"
+{
+    "DBInstance": {
+        "DBInstanceIdentifier": "vprofiledb",
+        "DBInstanceClass": "db.t3.micro",
+        "Engine": "mysql",
+        "DBInstanceStatus": "available",
+        "MasterUsername": "admin",
+        "DBName": "vprofilerdsrearch",
+        "Endpoint": {
+            "Address": "vprofiledb.cg********sa.us-east-1.rds.amazonaws.com",
+            "Port": 3306,
+            "HostedZoneId": "Z2R2ITUGPM61AM"
+        },
+...
+```
+
+Wait for the instance to be available:
+
+```bash
+user@DESKTOP-SCNMK3I UCRT64 ~/Documents/Udemy/DevOpsWithAI/20_vm-Automatically/62-vprofile-project-local/devops-exercise-from-local-to-cloud (main)
+Wed Oct 07 14:43:15
+$ aws rds wait db-instance-available     --db-instance-identifier "$DB_INSTANCE_NAME"     --region "$AWS_REGION"
+```
+
+We will also revoke our IP from the Security Group
+
+```bash
+user@DESKTOP-SCNMK3I UCRT64 ~/Documents/Udemy/DevOpsWithAI/20_vm-Automatically/62-vprofile-project-local/devops-exercise-from-local-to-cloud (main)
+Wed Oct 07 15:19:08
+$ aws ec2 revoke-security-group-ingress \
+    --group-id $SG_ID \
+    --protocol tcp \
+    --port 3306 \
+    --cidr $(curl -s ifconfig.me)/32 \
+    --region $AWS_REGION
+{
+    "Return": true,
+    "RevokedSecurityGroupRules": [
+        {
+            "SecurityGroupRuleId": "sgr-071************4c6",
+            "GroupId": "sg-09f************95e",
+            "IsEgress": false,
+            "IpProtocol": "tcp",
+            "FromPort": 3306,
+            "ToPort": 3306,
+            "CidrIpv4": "*89.*6*.2**.132/32"
+        }
+    ]
+}
 ```
 
 ## Create Elasticache instance
@@ -318,10 +456,8 @@ The ElastiCache cluster will be available after a few minutes:
 ![elasticache](images/elasticache.png)
 
 ## Create AmazonMQ instance
-The AmazonMQ instance will be created with the following configuration:
-* AmazonMQ 5.15.14 running on Amazon Linux 2
 
-To be in the cheapest tier, we will create a single-instance broker with no redundancy, so you may lose messages if replaced.
+The AmazonMQ instance will be created with the cheapest possible tier, hence we will create a single-instance broker with no redundancy, so you may lose messages if replaced.
 
 ```bash
 
@@ -373,7 +509,6 @@ This is how the AmazonMQ instance will look like in the AWS console:
 At the same time, the configuration of the AmazonMQ instance will look like this:
 
 ![active_mq_configuration](images/active_mq_configuration.png)
-
 
 ## Create Beanstalk environment
 The Beanstalk environment will be created with the following configuration:

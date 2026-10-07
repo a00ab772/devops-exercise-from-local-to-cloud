@@ -1,3 +1,4 @@
 .idea
 target
-aws/Automated_provisioning/.\$architecture-aws.drawio.bkp
+*.bkp
+*.pem
