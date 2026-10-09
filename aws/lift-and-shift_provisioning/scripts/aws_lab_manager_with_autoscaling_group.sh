@@ -608,6 +608,21 @@ do_cleanup() {
   success "Universal cleanup completed successfully!"
 }
 
+log "Step 9/9 — Cleaning up IAM Role and Instance Profile..."
+if aws iam get-instance-profile --instance-profile-name "$IAM_PROFILE_NAME" >/dev/null 2>&1; then
+  run "aws iam remove-role-from-instance-profile --instance-profile-name '$IAM_PROFILE_NAME' --role-name '$IAM_ROLE_NAME' 2>/dev/null || true"
+  run "aws iam delete-instance-profile --instance-profile-name '$IAM_PROFILE_NAME' 2>/dev/null || true"
+  success "-> Deleted Instance Profile: $IAM_PROFILE_NAME"
+fi
+
+if aws iam get-role --role-name "$IAM_ROLE_NAME" >/dev/null 2>&1; then
+  run "aws iam detach-role-policy --role-name '$IAM_ROLE_NAME' --policy-arn 'arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy' 2>/dev/null || true"
+  run "aws iam detach-role-policy --role-name '$IAM_ROLE_NAME' --policy-arn 'arn:aws:iam::aws:policy/service-role/AmazonElasticFileSystemClientReadWrite' 2>/dev/null || true"
+  run "aws iam detach-role-policy --role-name '$IAM_ROLE_NAME' --policy-arn 'arn:aws:iam::aws:policy/AmazonElasticFileSystemFullAccess' 2>/dev/null || true"
+  run "aws iam delete-role --role-name '$IAM_ROLE_NAME' 2>/dev/null || true"
+  success "-> Deleted IAM Role: $IAM_ROLE_NAME"
+fi
+
 # ---------- Execution Controller with Confirmation ----------
 case "$ACTION" in
   spinup)

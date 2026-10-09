@@ -452,7 +452,7 @@ do_create_ami() {
 do_cleanup() {
   log "Starting universal cleanup in region: $AWS_REGION"
 
-  log "Step 0/8 — Deregistering custom/user AMIs..."
+  log "Step 0/9 — Deregistering custom/user AMIs..."
   AMI_IDS=$(aws ec2 describe-images --region "$AWS_REGION" --owners self --query "Images[*].ImageId" --output text 2>/dev/null || echo "")
   for AMI_ID_ITEM in $AMI_IDS; do
     if [ -n "$AMI_ID_ITEM" ] && [ "$AMI_ID_ITEM" != "None" ]; then
@@ -461,7 +461,7 @@ do_cleanup() {
     fi
   done
 
-  log "Step 1/8 — Terminating active EC2 instances..."
+  log "Step 1/9 — Terminating active EC2 instances..."
   INSTANCE_INFO=$(aws ec2 describe-instances --region "$AWS_REGION" --filters "Name=instance-state-name,Values=pending,running,stopping,stopped" --query "Reservations[*].Instances[*].[InstanceId, Tags[?Key=='Name']|[0].Value]" --output text 2>/dev/null || echo "")
   while read -r INSTANCE_ID_ITEM INSTANCE_TAG; do
     if [ -n "$INSTANCE_ID_ITEM" ] && [ "$INSTANCE_ID_ITEM" != "None" ]; then
@@ -479,7 +479,7 @@ do_cleanup() {
     done <<< "$INSTANCE_INFO"
   fi
 
-  log "Step 2/8 — Deleting EFS File Systems and Mount Targets..."
+  log "Step 2/9 — Deleting EFS File Systems and Mount Targets..."
   EFS_INFO=$(aws efs describe-file-systems --region "$AWS_REGION" --query "FileSystems[*].[FileSystemId, to_string(Name)]" --output text 2>/dev/null || echo "")
   while read -r EFS_ID EFS_NAMEREF; do
     if [ -n "$EFS_ID" ] && [ "$EFS_ID" != "None" ]; then
@@ -500,7 +500,7 @@ do_cleanup() {
     fi
   done <<< "$EFS_INFO"
 
-  log "Step 3/8 — Finding and deleting Load Balancers..."
+  log "Step 3/9 — Finding and deleting Load Balancers..."
   ALB_INFO=$(aws elbv2 describe-load-balancers --region "$AWS_REGION" --query "LoadBalancers[*].[LoadBalancerArn, LoadBalancerName]" --output text 2>/dev/null || echo "")
   while read -r ALB_ARN ALB_NAMEREF; do
     if [ -n "$ALB_ARN" ] && [ "$ALB_ARN" != "None" ]; then
@@ -515,7 +515,7 @@ do_cleanup() {
     fi
   done <<< "$ALB_INFO"
 
-  log "Step 4/8 — Finding and deleting Auto Scaling Groups..."
+  log "Step 4/9 — Finding and deleting Auto Scaling Groups..."
   ASG_NAMES=$(aws autoscaling describe-auto-scaling-groups --region "$AWS_REGION" --query "AutoScalingGroups[*].AutoScalingGroupName" --output text 2>/dev/null || echo "")
   for ASG in $ASG_NAMES; do
     if [ -n "$ASG" ] && [ "$ASG" != "None" ]; then
@@ -526,7 +526,7 @@ do_cleanup() {
     fi
   done
 
-  log "Step 5/8 — Finding and deleting Target Groups..."
+  log "Step 5/9 — Finding and deleting Target Groups..."
   TG_INFO=$(aws elbv2 describe-target-groups --region "$AWS_REGION" --query "TargetGroups[*].[TargetGroupArn, TargetGroupName]" --output text 2>/dev/null || echo "")
   while read -r TG_ARN TG_NAMEREF; do
     if [ -n "$TG_ARN" ] && [ "$TG_ARN" != "None" ]; then
@@ -535,7 +535,7 @@ do_cleanup() {
     fi
   done <<< "$TG_INFO"
 
-  log "Step 6/8 — Finding and deleting Launch Templates..."
+  log "Step 6/9 — Finding and deleting Launch Templates..."
   LT_INFO=$(aws ec2 describe-launch-templates --region "$AWS_REGION" --query "LaunchTemplates[*].[LaunchTemplateId, LaunchTemplateName]" --output text 2>/dev/null || echo "")
   while read -r LT_ID LT_NAMEREF; do
     if [ -n "$LT_ID" ] && [ "$LT_ID" != "None" ]; then
@@ -544,7 +544,7 @@ do_cleanup() {
     fi
   done <<< "$LT_INFO"
 
-  log "Step 7/8 — Removing all ingress/egress rules and deleting Security Groups..."
+  log "Step 7/9 — Removing all ingress/egress rules and deleting Security Groups..."
   SG_IDS=$(aws ec2 describe-security-groups --region "$AWS_REGION" --query "SecurityGroups[?GroupName != 'default'].GroupId" --output text 2>/dev/null || echo "")
 
   for SG_ID in $SG_IDS; do
@@ -576,12 +576,27 @@ do_cleanup() {
     fi
   done
 
-  log "Step 8/8 — Cleaning up CloudWatch logs..."
+  log "Step 8/9 — Cleaning up CloudWatch logs..."
   aws logs describe-log-groups --region "$AWS_REGION" --query 'logGroups[*].logGroupName' --output text 2>/dev/null | tr '\t' '\n' | while read -r GROUP; do
       if [ -n "$GROUP" ] && [ "$GROUP" != "None" ]; then
           run "MSYS_NO_PATHCONV=1 aws logs delete-log-group --log-group-name '$GROUP' --region '$AWS_REGION'" 2>/dev/null || true
       fi
   done
+
+  log "Step 9/9 — Cleaning up IAM Role and Instance Profile..."
+  if aws iam get-instance-profile --instance-profile-name "$IAM_PROFILE_NAME" >/dev/null 2>&1; then
+    run "aws iam remove-role-from-instance-profile --instance-profile-name '$IAM_PROFILE_NAME' --role-name '$IAM_ROLE_NAME' 2>/dev/null || true"
+    run "aws iam delete-instance-profile --instance-profile-name '$IAM_PROFILE_NAME' 2>/dev/null || true"
+    success "-> Deleted Instance Profile: $IAM_PROFILE_NAME"
+  fi
+
+  if aws iam get-role --role-name "$IAM_ROLE_NAME" >/dev/null 2>&1; then
+    run "aws iam detach-role-policy --role-name '$IAM_ROLE_NAME' --policy-arn 'arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy' 2>/dev/null || true"
+    run "aws iam detach-role-policy --role-name '$IAM_ROLE_NAME' --policy-arn 'arn:aws:iam::aws:policy/service-role/AmazonElasticFileSystemClientReadWrite' 2>/dev/null || true"
+    run "aws iam detach-role-policy --role-name '$IAM_ROLE_NAME' --policy-arn 'arn:aws:iam::aws:policy/AmazonElasticFileSystemFullAccess' 2>/dev/null || true"
+    run "aws iam delete-role --role-name '$IAM_ROLE_NAME' 2>/dev/null || true"
+    success "-> Deleted IAM Role: $IAM_ROLE_NAME"
+  fi
 
   success "Universal cleanup completed successfully!"
 }
@@ -589,14 +604,12 @@ do_cleanup() {
 # ---------- Execution Controller with Confirmation ----------
 case "$ACTION" in
   spinup)
-    # Check if instance name was passed via flag so prompt works smoothly
     for arg in "$@"; do
       if [ "$arg" = "--instance-name" ]; then
         CLI_INSTANCE_NAME_PROMPTED=true
       fi
     done
 
-    # If instance-name wasn't flagged, prompt for it before showing summary
     if [ -z "${CLI_INSTANCE_NAME_PROMPTED:-}" ]; then
       read -p "Enter a choice for the EC2 Instance Name (default: Web-Server-Instance): " USER_INPUT_NAME
       if [ -n "$USER_INPUT_NAME" ]; then

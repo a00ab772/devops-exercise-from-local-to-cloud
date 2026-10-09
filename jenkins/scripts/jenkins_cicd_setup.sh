@@ -84,7 +84,7 @@ update-rc.d nexus defaults && systemctl start nexus
 log "Setting up daily shutdown cron job..."
 INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
 REGION=$(curl -s http://169.254.169.254/latest/meta-data/placement/region)
-echo "0 0 * * * root aws ec2 stop-instances --instance-ids $INSTANCE_ID --region $AWS_REGION" > /etc/cron.d/daily-shutdown
+echo "0 0 * * * root aws ec2 stop-instances --instance-ids $INSTANCE_ID --region $REGION" > /etc/cron.d/daily-shutdown
 chmod 644 /etc/cron.d/daily-shutdown
 log "Provisioning complete!"
 EOF
@@ -96,7 +96,7 @@ provision() {
     generate_user_data
 
     log "Fetching latest Ubuntu AMI..."
-    AMI_ID=$(aws ssm get-parameters --names /aws/service/canonical/ubuntu/server/24.04/stable/current/amd64/hvm/ebs-gp3/ami-id --query "Parameters[0].Value" --output text --region "$REGION")
+    AMI_ID=$(aws ssm get-parameters --names /aws/service/canonical/ubuntu/server/24.04/stable/current/amd64/hvm/ebs-gp3/ami-id --query "Parameters[0].Value" --output text --region "$AWS_REGION")
 
     log "Launching EC2 Instance with 30GB gp3 storage..."
     INSTANCE_ID=$(aws ec2 run-instances \
@@ -108,7 +108,7 @@ provision() {
         --user-data file://user-data.sh \
         --block-device-mappings '[{"DeviceName":"/dev/sda1","Ebs":{"VolumeSize":30,"VolumeType":"gp3"}}]' \
         --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=$TAG_NAME}]" \
-        --query 'Instances[0].InstanceId' --output text --region "$REGION")
+        --query 'Instances[0].InstanceId' --output text --region "$AWS_REGION")
 
     log "Successfully provisioned instance ID: $INSTANCE_ID"
 }
@@ -142,7 +142,7 @@ teardown() {
 
     if aws iam get-role --role-name "$ROLE_NAME" >/dev/null 2>&1; then
         aws iam detach-role-policy --role-name "$ROLE_NAME" --policy-arn arn:aws:iam::aws:policy/AmazonEC2FullAccess >/dev/null || true
-        aws iam delete-role --role-name "$ROLE_NAME" >/dev/null || true
+        aws iam delete-role --role-name "$ROLE_NAME" --role-name "$ROLE_NAME" >/dev/null || true
     fi
 
     log "Teardown complete!"
