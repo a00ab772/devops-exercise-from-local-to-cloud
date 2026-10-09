@@ -46,12 +46,16 @@ NEXUS_URL="https://download.sonatype.com/nexus/3/nexus-3.77.2-02-unix.tar.gz"
 wget "$NEXUS_URL" -O nexus.tar.gz || wget "https://download.sonatype.com/nexus/3/latest-unix.tar.gz" -O nexus.tar.gz
 tar -xvf nexus.tar.gz && rm -rf nexus && mv nexus-3* nexus && chown -R nexus:nexus /opt/nexus
 
-# Configuring nexus user and forcing Java 17 usage
+# Configuring nexus user and forcing Java 17 usage to avoid install4j restrictions
 echo 'run_as_user="nexus"' > /opt/nexus/bin/nexus.rc
 echo 'INSTALL4J_JAVA_HOME="/usr/lib/jvm/java-17-openjdk-amd64"' >> /opt/nexus/bin/nexus.rc
 echo '-Dinstall4j.javaHome=/usr/lib/jvm/java-17-openjdk-amd64' >> /opt/nexus/bin/nexus.vmoptions
 
-# Create native Systemd service for Nexus
+chown -R nexus:nexus /opt/nexus
+mkdir -p /opt/sonatype-work
+chown -R nexus:nexus /opt/sonatype-work
+
+# Crear servicio nativo de Systemd para Nexus
 cat << 'EOT' > /etc/systemd/system/nexus.service
 [Unit]
 Description=Nexus Service
@@ -65,11 +69,13 @@ ExecStop=/opt/nexus/bin/nexus stop
 User=nexus
 Group=nexus
 Restart=on-failure
+RestartSec=10
 
 [Install]
 WantedBy=multi-user.target
 EOT
 
+# Crear servicio nativo de Systemd para SonarQube
 cat << 'EOT' > /etc/systemd/system/sonarqube.service
 [Unit]
 Description=SonarQube service
