@@ -11,7 +11,7 @@ readonly PROFILE_NAME="EC2ShutdownProfile"
 readonly TAG_NAME="Jenkins-DevSecOps"
 
 log() {
-    echo "[$(date +'%Y-%m-%d %H:%M:%S')] $1"
+    echo "[$(date +'%Y-%m-%d %H:%M:%S')] $1" >&2
 }
 
 usage() {
@@ -26,14 +26,19 @@ create_security_group() {
             --description "SG for Jenkins, Nexus, SonarQube POC" \
             --query 'GroupId' --output text --region "$AWS_REGION")
 
+        log "Fetching your public IP address..."
+        MY_IP=$(curl -s http://checkip.amazonaws.com)
+        MY_IP_CIDR="${MY_IP}/32"
+        log "Restricting inbound access to your IP: $MY_IP_CIDR"
+
         log "Opening inbound ports..."
         for port in 22 8080 8081 9000; do
-            aws ec2 authorize-security-group-ingress --group-id "$SG_ID" --protocol tcp --port "$port" --cidr 0.0.0.0/0 --region "$AWS_REGION" >/dev/null
+            aws ec2 authorize-security-group-ingress --group-id "$SG_ID" --protocol tcp --port "$port" --cidr "$MY_IP_CIDR" --region "$AWS_REGION" >/dev/null
         done
     fi
+
     echo "$SG_ID"
 }
-
 setup_iam_profile() {
     log "Checking/Configuring IAM Instance Profile..."
     if ! aws iam get-role --role-name "$ROLE_NAME" >/dev/null 2>&1; then
@@ -96,7 +101,7 @@ provision() {
     generate_user_data
 
     log "Fetching latest Ubuntu AMI..."
-    AMI_ID=$(aws ssm get-parameters --names /aws/service/canonical/ubuntu/server/24.04/stable/current/amd64/hvm/ebs-gp3/ami-id --query "Parameters[0].Value" --output text --region "$AWS_REGION")
+    AMI_ID=$(aws ec2 describe-images --region "$AWS_REGION" --owners 099720109477 --filters "Name=name,Values=ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-amd64-server-*" "Name=state,Values=available" --query "sort_by(Images, &CreationDate)[-1].ImageId" --output text)
 
     log "Launching EC2 Instance with 30GB gp3 storage..."
     INSTANCE_ID=$(aws ec2 run-instances \

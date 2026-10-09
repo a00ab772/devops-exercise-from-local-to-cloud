@@ -730,7 +730,7 @@ The backend services (RDS, Elasticache and ActiveMQ) are in the same VPC, so the
 Get the Elastic Beanstalk security group id:
 
 ```bash
-user@DESKTOP-SCNMK3I UCRT64 ~/Documents/Udemy/DevOpsWithAI/20_vm-Automatically/62-vprofile-project-local/devops-exercise-from-local-to-cloud/aws (main)
+user@DESKTOP-SCNMK3I UCRT64 ~/Documents/devops-exercise-from-local-to-cloud/aws (main)
 Wed Oct 07 16:53:03
 $ EBS_SG_ID=$(aws ec2 describe-security-groups \
     --filters "Name=tag:elasticbeanstalk:environment-name,Values=$EBS_ENVIRONMENT_NAME" \
@@ -742,7 +742,7 @@ $ EBS_SG_ID=$(aws ec2 describe-security-groups \
 Authorize the Elastic Beanstalk to access to the RDS service in the `vprofile-backend-sg` Security Group:
 
 ```bash 
-user@DESKTOP-SCNMK3I UCRT64 ~/Documents/Udemy/DevOpsWithAI/20_vm-Automatically/62-vprofile-project-local/devops-exercise-from-local-to-cloud/aws (main)
+user@DESKTOP-SCNMK3I UCRT64 ~/Documents/devops-exercise-from-local-to-cloud/aws (main)
 Wed Oct 07 16:56:28
 $ aws ec2 authorize-security-group-ingress \
     --group-id $SG_ID \
@@ -775,7 +775,7 @@ $ aws ec2 authorize-security-group-ingress \
 Authorize the Elastic Beanstalk to access to the ElastiCache service in the `vprofile-backend-sg` Security Group:
 
 ```bash
-user@DESKTOP-SCNMK3I UCRT64 ~/Documents/Udemy/DevOpsWithAI/20_vm-Automatically/62-vprofile-project-local/devops-exercise-from-local-to-cloud/aws (main)
+user@DESKTOP-SCNMK3I UCRT64 ~/Documents/devops-exercise-from-local-to-cloud/aws (main)
 Wed Oct 07 16:58:12
 $ aws ec2 authorize-security-group-ingress \
 --group-id $SG_ID \
@@ -809,7 +809,7 @@ $ aws ec2 authorize-security-group-ingress \
 Authorize the Elastic Beanstalk to access to the Amazon MQ service in the `vprofile-backend-sg` Security Group:
 
 ```bash
-user@DESKTOP-SCNMK3I UCRT64 ~/Documents/Udemy/DevOpsWithAI/20_vm-Automatically/62-vprofile-project-local/devops-exercise-from-local-to-cloud/aws (main)
+user@DESKTOP-SCNMK3I UCRT64 ~/Documents/devops-exercise-from-local-to-cloud/aws (main)
 Wed Oct 07 17:04:56
 $ aws ec2 authorize-security-group-ingress \
 --group-id $SG_ID \

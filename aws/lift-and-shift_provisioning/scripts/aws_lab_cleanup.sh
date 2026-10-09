@@ -45,7 +45,7 @@ echo ""
 # ============================================================
 # STEP 1 — Delete All Non-Default Application Load Balancers
 # ============================================================
-log "Step 1/6 — Scanning for Load Balancers..."
+log "Step 1/7 — Scanning for Load Balancers..."
 ALB_ARNS=$(aws elbv2 describe-load-balancers --region "$REGION" --query "LoadBalancers[?contains(LoadBalancerName, 'bill') == `false`].LoadBalancerArn" --output text 2>/dev/null || echo "")
 
 for ALB_ARN in $ALB_ARNS; do
@@ -64,7 +64,7 @@ echo ""
 # ============================================================
 # STEP 2 — Delete All Non-Default Auto Scaling Groups
 # ============================================================
-log "Step 2/6 — Scanning for Auto Scaling Groups..."
+log "Step 2/7 — Scanning for Auto Scaling Groups..."
 ASG_NAMES=$(aws autoscaling describe-auto-scaling-groups --region "$REGION" --query "AutoScalingGroups[?contains(AutoScalingGroupName, 'bill') == `false`].AutoScalingGroupName" --output text 2>/dev/null || echo "")
 
 for ASG in $ASG_NAMES; do
@@ -80,7 +80,7 @@ echo ""
 # ============================================================
 # STEP 3 — Delete All Non-Default Target Groups
 # ============================================================
-log "Step 3/6 — Scanning for Target Groups..."
+log "Step 3/7 — Scanning for Target Groups..."
 TG_ARNS=$(aws elbv2 describe-target-groups --region "$REGION" --query "TargetGroups[?contains(TargetGroupName, 'bill') == `false`].TargetGroupArn" --output text 2>/dev/null || echo "")
 
 for TG_ARN in $TG_ARNS; do
@@ -95,7 +95,7 @@ echo ""
 # ============================================================
 # STEP 4 — Delete All Non-Default Launch Templates
 # ============================================================
-log "Step 4/6 — Scanning for Launch Templates..."
+log "Step 4/7 — Scanning for Launch Templates..."
 LT_IDS=$(aws ec2 describe-launch-templates --region "$REGION" --query "LaunchTemplates[?contains(LaunchTemplateName, 'bill') == `false`].LaunchTemplateId" --output text 2>/dev/null || echo "")
 
 for LT_ID in $LT_IDS; do
@@ -110,7 +110,7 @@ echo ""
 # ============================================================
 # STEP 5 — Delete Custom Security Groups (Excluding 'default')
 # ============================================================
-log "Step 5/6 — Scanning for custom Security Groups..."
+log "Step 5/7 — Scanning for custom Security Groups..."
 SG_IDS=$(aws ec2 describe-security-groups --region "$REGION" --query "SecurityGroups[?GroupName != 'default' && contains(GroupName, 'bill') == `false`].GroupId" --output text 2>/dev/null || echo "")
 
 for SG_ID in $SG_IDS; do
@@ -124,7 +124,7 @@ echo ""
 # ============================================================
 # STEP 6 — Delete CloudWatch Log Groups & Alarms (Excluding 'bill')
 # ============================================================
-log "Step 6/6 — Scanning for Log Groups and Alarms..."
+log "Step 6/7 — Scanning for Log Groups and Alarms..."
 aws logs describe-log-groups --region "$REGION" --query 'logGroups[*].logGroupName' --output text 2>/dev/null | tr '\t' '\n' | while read -r GROUP; do
     if [[ -n "$GROUP" && "$GROUP" != "None" ]]; then
         if [[ "$GROUP" =~ [Bb][Ii][Ll][lL] ]]; then
@@ -150,3 +150,41 @@ echo ""
 echo -e "${GREEN}============================================================${NC}"
 echo -e "${GREEN} Universal cleanup complete! All user objects purged (billing protected).${NC}"
 echo -e "${GREEN}============================================================${NC}"
+
+# ============================================================
+# STEP 7 — Delete Custom IAM Roles and Instance Profiles
+# ============================================================
+log "Step 7/7 — Delete Custom IAM Roles and Instance Profiles..."
+
+log "1. Delete instance profiles and disassociate roles..."
+
+# 1. Delete instance profiles and disassociate roles
+PROFILES=$(aws iam list-instance-profiles --query "InstanceProfiles[*].InstanceProfileName" --output text 2>/dev/null || echo "")
+for PROFILE in $PROFILES; do
+    if [[ -n "$PROFILE" && "$PROFILE" != "None" ]]; then
+        log "Found instance profile: $PROFILE"
+        ROLES_IN_PROFILE=$(aws iam get-instance-profile --instance-profile-name "$PROFILE" --query "InstanceProfile.Roles[*].RoleName" --output text 2>/dev/null || echo "")
+        for R in $ROLES_IN_PROFILE; do
+            run "aws iam remove-role-from-instance-profile --instance-profile-name '$PROFILE' --role-name '$R' 2>/dev/null || true"
+        done
+        run "aws iam delete-instance-profile --instance-profile-name '$PROFILE' 2>/dev/null || true"
+        success "Deleted instance profile: $PROFILE"
+    fi
+done
+
+# 2. Delete custom roles (excluding service-linked roles)
+log "2. Delete custom roles (excluding service-linked roles)..."
+ROLES=$(aws iam list-roles --query "Roles[?starts_with(RoleName, 'AWSServiceRole') == \`false\`].RoleName" --output text 2>/dev/null || echo "")
+for ROLE in $ROLES; do
+    if [[ -n "$ROLE" && "$ROLE" != "None" ]]; then
+        log "Found custom role: $ROLE. Detaching policies..."
+        POLICIES=$(aws iam list-attached-role-policies --role-name "$ROLE" --query "AttachedPolicies[*].PolicyArn" --output text 2>/dev/null || echo "")
+        for POLICY in $POLICIES; do
+            run "aws iam detach-role-policy --role-name '$ROLE' --policy-arn '$POLICY' 2>/dev/null || true"
+        done
+        run "aws iam delete-role --role-name '$ROLE' 2>/dev/null || true"
+        success "Deleted IAM role: $ROLE"
+    fi
+done
+echo ""
+
