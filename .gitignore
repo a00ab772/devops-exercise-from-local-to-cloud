@@ -2,4 +2,4 @@
 target
 *.bkp
 *.pem
-sonarqube-*.zip
+sonarqube-*.zipjenkins/scripts/*.zip
