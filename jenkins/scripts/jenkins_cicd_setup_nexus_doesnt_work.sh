@@ -116,6 +116,7 @@ log "Downloading SonarQube from S3 bucket..."
 useradd -r -M -d /opt/sonarqube -s /bin/bash sonarqube || true
 aws s3 cp s3://$ACTIVE_S3_BUCKET/sonarqube.zip /tmp/sonarqube.zip --region $AWS_REGION
 unzip -q /tmp/sonarqube.zip -d /tmp
+# Aseguramos mover el contenido exacto y dar permisos de ejecución al script de arranque
 rm -rf /opt/sonarqube
 mv /tmp/sonarqube-* /opt/sonarqube
 chown -R sonarqube:sonarqube /opt/sonarqube
@@ -134,15 +135,18 @@ apt-get install -y openjdk-17-jre
 cd /opt
 useradd -r -M -d /opt/nexus -s /bin/false nexus || true
 NEXUS_URL="https://download.sonatype.com/nexus/3/nexus-3.77.2-02-unix.tar.gz"
-wget "\$NEXUS_URL" -O nexus.tar.gz || wget "https://download.sonatype.com/nexus/3/latest-unix.tar.gz" -O nexus.tar.gz
+wget "$NEXUS_URL" -O nexus.tar.gz || wget "https://download.sonatype.com/nexus/3/latest-unix.tar.gz" -O nexus.tar.gz
 tar -xvf nexus.tar.gz && rm -rf nexus && mv nexus-3* nexus && chown -R nexus:nexus /opt/nexus
 
-# Configuring nexus user and forcing Java 17 usage
+# Configuring nexus user and forcing Java 17 usage to avoid install4j restrictions
 echo 'run_as_user="nexus"' > /opt/nexus/bin/nexus.rc
 echo 'INSTALL4J_JAVA_HOME="/usr/lib/jvm/java-17-openjdk-amd64"' >> /opt/nexus/bin/nexus.rc
 echo '-Dinstall4j.javaHome=/usr/lib/jvm/java-17-openjdk-amd64' >> /opt/nexus/bin/nexus.vmoptions
 
-# Create native Systemd service for Nexus
+ln -sf /opt/nexus/bin/nexus /etc/init.d/nexus
+update-rc.d nexus defaults && systemctl start nexus
+sudo chown -R nexus:nexus /opt/nexus
+sudo chown -R nexus:nexus /opt/sonatype-work || true
 cat << 'EOT' > /etc/systemd/system/nexus.service
 [Unit]
 Description=Nexus Service
@@ -156,10 +160,14 @@ ExecStop=/opt/nexus/bin/nexus stop
 User=nexus
 Group=nexus
 Restart=on-failure
+RestartSec=10
 
 [Install]
 WantedBy=multi-user.target
 EOT
+
+systemctl daemon-reload
+systemctl enable --now sonarqube
 
 cat << 'EOT' > /etc/systemd/system/sonarqube.service
 [Unit]
@@ -181,7 +189,6 @@ WantedBy=multi-user.target
 EOT
 
 systemctl daemon-reload
-systemctl enable --now nexus
 systemctl enable --now sonarqube
 
 log "Setting up daily shutdown cron job..."
