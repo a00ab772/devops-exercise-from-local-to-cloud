@@ -35,21 +35,34 @@ Next, we will cover the automated provisioning method, which uses scripts to set
 
 Before we move the project to the cloud, we will first deploy a static web application to AWS cloud using a lift and shift approach with a mix of manual and semi-automated provisioning methods via bash scripting. This will give us a better understanding of the required steps to deploy a web application in AWS cloud.
 
-Let's do a step-by-step walkthrough of the process of deploying a static web application to AWS cloud using both manual and automated provisioning methods.
+Let's do a step-by-step walkthrough of the process of deploying a static web application to AWS cloud using a lift-and-shift approach with an Infrastructure As A Service (IAAS) approach on which we will install and configure several services over these basic building blocks: EC2, S3, RDS, VPC, IAM, Security Groups, Route53, CloudFront, ELB.
 
-(IAAS: EC2, S3, RDS, VPC, IAM, Security Groups, Route53, CloudFront, ELB)
-
-* [AWS Manual Provisioning](./aws/Manual_provisioning/README.md)
+* [AWS Manual Provisioning (IAAS: EC2, S3, RDS, VPC, IAM, Security Groups, Route53, CloudFront, ELB)](aws/lift-and-shift_provisioning/README.md)
 
 # Re-factoring AWS cloud provisioning of our Dynamic Web Application
 
-(IAAC: Ansible, Terraform, CloudFormation)
-(CI/CD: Jenkins, GitHub Actions, GitLab CI/CD, CircleCI, Travis CI)
-(PAAS and SAAS: RDS, VPC, IAM, Security Groups, Route53, CloudFront, ELB, S3, EKS, ECR, ECS)
+In this section we will re-factor the previous deployment, replacing the Infrastructure services for AWS Services.
 
-* [AWS Automated Provisioning](./aws/Automated_provisioning/README.md)
+Let's do a step by step walkthrought of the process deploying the static web application to AWS cloud using a PAAS approach where we will deploy:
+
+. Elastic Beanstalk, and EFS as part of the front end services.
+. RDS, Amazon MQ and ElastiCache as part of the backend services.
+. Route 53 and CloudFront as part of the networking and Content Delivery services. 
+
+* [AWS Re-factor (re-architect) provisioning](aws/re-factor_provisioning/README.md)
+
+# Continuous Integration
+
+(CI/CD: Jenkins, GitHub Actions, GitLab CI/CD, CircleCI, Travis CI)
+
+## Jenkins
+
+[CI/CD using Jenkins](jenkins/README.md)
 
 To be continued ....
+
+(IAAC: Ansible, Terraform, CloudFormation)
+(PAAS and SAAS: RDS, VPC, IAM, Security Groups, Route53, CloudFront, ELB, S3, EKS, ECR, ECS)
 
 # Kubernetes cloud provisioning
 

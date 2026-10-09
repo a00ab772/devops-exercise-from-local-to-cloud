@@ -34,7 +34,9 @@ That will achieve low operational overhead, high availability, and high scalabil
 
 * Elasticache: A fully managed in-memory data store service that supports Redis and Memcached. It can be used to improve the performance of our application by caching frequently accessed data. It will take care of the memcached service, which will allow us to store and retrieve data quickly. It will automatically handle the scaling, patching, and backup of our cache.
 
-* ActiveMQ: A managed message broker service that supports multiple messaging protocols, including AMQP, MQTT, and STOMP. It can be used to decouple our application components and improve the scalability and reliability of our application. It will take care of the RabbitMQ service, which will allow us to send and receive messages between our application components. It will automatically handle the scaling, patching, and backup of our message broker.
+* Amazon MQ: A managed message broker service that supports multiple messaging protocols, including AMQP, MQTT, and STOMP. It can be used to decouple our application components and improve the scalability and reliability of our application. It will take care of the RabbitMQ service, which will allow us to send and receive messages between our application components. It will automatically handle the scaling, patching, and backup of our message broker.
+
+## Networking and Content Delivery services
 
 * Route53: A scalable and highly available domain name system (DNS) web service that translates domain names into IP addresses. It allows us to route traffic to our application resources, such as EC2 instances, S3 buckets, and load balancers.
 
@@ -81,7 +83,7 @@ Make the traffic to this security group only accessible from instances in the se
 ```bash
 user@DESKTOP-SCNMK3I UCRT64 ~/Documents/devops-exercise-from-local-to-cloud/aws (main)
 Wed Oct 07 07:52:01
-$ $ aws ec2 authorize-security-group-ingress \
+$ aws ec2 authorize-security-group-ingress \
     --group-id "$SG_ID" \
     --protocol -1 \
     --port -1 \
@@ -123,6 +125,9 @@ First, we will create a parameter group for the RDS instance, which will allow u
 ```bash
 user@DESKTOP-SCNMK3I UCRT64 ~/Documents/devops-exercise-from-local-to-cloud/aws (main)
 Wed Oct 07 08:26:27
+$ DB_PG_NAME="vprofile-mysql-pg"
+$ DB_PG_DESC="Parameter group for the vprofile MySQL RDS instance"
+$ DB_FAMILY="mysql8.4"
 $ RDS_PG_ARN=$(aws rds create-db-parameter-group \
     --db-parameter-group-name "$DB_PG_NAME" \
     --db-parameter-group-family "$DB_FAMILY" \
@@ -153,7 +158,7 @@ Wed Oct 07 10:18:48
 $ RDS_SG_NAME=$(aws rds create-db-subnet-group \
     --db-subnet-group-name "$SG_NAME" \
     --db-subnet-group-description "$SG_DESC" \
-    --subnet-ids ${SUBNET_IDS[@]} \
+    --subnet-ids "${SUBNET_IDS[@]}" \
     --region "$AWS_REGION" \
     --query "DBSubnetGroup.DBSubnetGroupName" \
     --output text)
@@ -201,6 +206,14 @@ $ aws rds create-db-instance \
 arn:aws:rds:us-east-1:43030********:db:vprofiledb
 ```
 
+Wait for the instance to be available:
+
+```bash
+user@DESKTOP-SCNMK3I UCRT64 ~/Documents/devops-exercise-from-local-to-cloud (main)
+Wed Oct 07 14:43:15
+$ aws rds wait db-instance-available     --db-instance-identifier "$DB_INSTANCE_NAME"     --region "$AWS_REGION"
+```
+
 After a few minutes, the RDS instance will be available:
 
 ![mysql_rds](images/mysql_rds.png)
@@ -221,6 +234,7 @@ $ mysql -h vprofiledb.cg**********8tsa.us-east-1.rds.amazonaws.com -P 3306 -u ad
 Enter password: ***********
 ERROR 2003 (HY000): Can't connect to MySQL server on 'vprofiledb.cg**********8tsa.us-east-1.rds.amazonaws.com:3306' (10060)
 ```
+
 
 Temporarily, we will modify the RDS instance to be publicly accessible, so we can connect to it using the endpoint:
 
@@ -244,21 +258,13 @@ $ aws rds modify-db-instance \
 ...
 ```
 
-Wait for the instance to be available:
-
-```bash
-user@DESKTOP-SCNMK3I UCRT64 ~/Documents/devops-exercise-from-local-to-cloud (main)
-Wed Oct 07 14:43:15
-$ aws rds wait db-instance-available     --db-instance-identifier "$DB_INSTANCE_NAME"     --region "$AWS_REGION"
-```
-
 We will also add our IP to the Correct Security Group
 
 ```bash
 user@DESKTOP-SCNMK3I UCRT64 ~/Documents/devops-exercise-from-local-to-cloud (main)
 Wed Oct 07 15:01:08
 $ aws ec2 authorize-security-group-ingress \
-    --group-id "sg-09f************95e" \
+    --group-id $SG_ID \
     --protocol tcp \
     --port 3306 \
     --cidr $(curl -s ifconfig.me)/32 \
@@ -394,7 +400,7 @@ $ aws elasticache create-cache-subnet-group \
 
 ![elasticache_subnet_group](images/elasticache_subnet_group.png)
 
-Create a parameter group using the default Memcached settings. A custom parameter group is unnecessary unless you need non-default Memcached settings; omit it to use the default group.
+Just to illustrate how you would do it, create a parameter group using the default Memcached settings. A custom parameter group is unnecessary unless you need non-default Memcached settings; omit it to use the default group.
 
 ```bash
 ELASTICACHE_PG_NAME="vprofile-elasticache-parameter-group"
@@ -455,14 +461,11 @@ The ElastiCache cluster will be available after a few minutes:
 
 ![elasticache](images/elasticache.png)
 
-## Create AmazonMQ instance
+## Create Amazon MQ instance
 
 The AmazonMQ instance will be created with the cheapest possible tier, hence we will create a single-instance broker with no redundancy, so you may lose messages if replaced.
 
 ```bash
-
-user@DESKTOP-SCNMK3I UCRT64 ~/Documents/devops-exercise-from-local-to-cloud/aws (main)
-Wed Oct 07 13:46:05
 $user@DESKTOP-SCNMK3I UCRT64 ~/Documents/devops-exercise-from-local-to-cloud/aws (main)
 Wed Oct 07 13:49:06
 $ MQ_ENGINE_VERSION=$(aws mq describe-broker-engine-types \
@@ -526,8 +529,9 @@ First, we create the IAM Role & Instance Profile:
 ```bash
 user@DESKTOP-SCNMK3I UCRT64 ~/Documents/devops-exercise-from-local-to-cloud/aws (main)
 Wed Oct 07 16:12:59
+$ EBS_ROLE_NAME="vprofile-eb-ec2-role"
 $ aws iam create-role \
-    --role-name vprofile-eb-ec2-role \
+    --role-name $EBS_ROLE_NAME \
     --assume-role-policy-document '{
       "Version": "2012-10-17",
       "Statement": [{
@@ -560,25 +564,26 @@ $ aws iam create-role \
 }
 ```
 
-* Attach Minimum Required Managed Policy (Web Tier only)
+* Attach Minimum Required Managed Policy to the role (Web Tier only)
 
 ```bash
 user@DESKTOP-SCNMK3I UCRT64 ~/Documents/devops-exercise-from-local-to-cloud/aws (main)
 Wed Oct 07 16:13:06
 $ aws iam attach-role-policy \
---role-name vprofile-eb-ec2-role \
+--role-name $EBS_ROLE_NAME \
 --policy-arn arn:aws:iam::aws:policy/AWSElasticBeanstalkWebTier
 ```
 
 This policy grants only what's needed: read app versions from S3, write logs to S3, and report health to Elastic Beanstalk.
 
-* Create the Instance Profile and attach the Role
+* Create the Instance Profile and attach the role to it:
 
 ```bash
 user@DESKTOP-SCNMK3I UCRT64 ~/Documents/devops-exercise-from-local-to-cloud/aws (main)
 Wed Oct 07 16:13:39
+$ EBS_INSTANCE_PROFILE_NAME="vprofile-eb-instance-profile"
 $ aws iam create-instance-profile \
---instance-profile-name vprofile-eb-instance-profile
+--instance-profile-name $EBS_INSTANCE_PROFILE_NAME
 {
     "InstanceProfile": {
         "Path": "/",
@@ -595,8 +600,8 @@ $ aws iam create-instance-profile \
 user@DESKTOP-SCNMK3I UCRT64 ~/Documents/devops-exercise-from-local-to-cloud/aws (main)
 Wed Oct 07 16:14:29
 $ aws iam add-role-to-instance-profile \
---instance-profile-name vprofile-eb-instance-profile \
---role-name vprofile-eb-ec2-role
+--instance-profile-name $EBS_INSTANCE_PROFILE_NAME \
+--role-name $EBS_ROLE_NAME
 ```
 
 * Create the Elastic Beanstalk Application
@@ -641,7 +646,7 @@ This is how the ElasticBeanstalk application looks like in the UI:
 
 ![ebs_application](images/ebs_application.png)
 
-* Create the Environment (Free Tier — Single Instance, t3.micro)
+* Create the EBS environment (Free Tier — Single Instance, t3.micro)
 
 EBS_ENVIRONMENT_NAME="vprofile-web-env"
 EBS_STACK_NAME="64bit Amazon Linux 2023 v5.14.9 running Tomcat 10 Corretto 17"
@@ -659,7 +664,7 @@ $ aws elasticbeanstalk create-environment \
 --environment-name $EBS_ENVIRONMENT_NAME \
 --solution-stack-name "$EBS_STACK_NAME" \
 --option-settings \
-Namespace=aws:autoscaling:launchconfiguration,OptionName=IamInstanceProfile,Value=vprofile-eb-instance-profile \
+Namespace=aws:autoscaling:launchconfiguration,OptionName=IamInstanceProfile,Value=$EBS_INSTANCE_PROFILE_NAME \
 Namespace=aws:autoscaling:launchconfiguration,OptionName=InstanceType,Value=t3.micro \
 Namespace=aws:elasticbeanstalk:environment,OptionName=EnvironmentType,Value=SingleInstance \
 --region $AWS_REGION
@@ -699,7 +704,7 @@ $
 
 ![ebs_environment](images/ebs_environment.png)
 
-* Get Your Application URL
+* Get your Elastic Beanstalk application URL:
 
 ```bash
 user@DESKTOP-SCNMK3I UCRT64 ~/Documents/devops-exercise-from-local-to-cloud/aws (main)
@@ -840,6 +845,16 @@ $ aws ec2 authorize-security-group-ingress \
 ## Update backend SG to allow internal traffic
 
 The backend services (RDS, Elasticache and ActiveMQ) are in the same VPC, so they can communicate with each other using their private IP addresses. However, the Beanstalk environment is in a different VPC, so we need to allow access from the Beanstalk SG to the backend SG.
+
+
+# Provisioned automation via bash scripts
+
+To facilitate the enviornment provisioning I have created for you the [manual_rearchitectural_provisioning.sh](scripts/manual_rearchitectural_provisioning.sh).
+
+Play around with it and don't forget to run the  [manual_rearchitectural_teardown.sh](scripts/manual_rearchitectural_teardown.sh) script after you finish to avoid unwanted bills!  
+
+
+(WIP)
 
 ## Launch ec2-instance for DB initialization
 The ec2-instance will be launched with the following configuration:
