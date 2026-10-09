@@ -6,7 +6,19 @@ In this section, we will provide a detailed explanation of how we implement CI/C
 
 # Jenkins CI setup
 
-You can use the provided [jenkins_cicd_setup.sh](scripts/jenkins_cicd_setup.sh) bash script to provision a free tier ubuntu host with 30Gb of disk. The script will take care on your behalf of the following items:
+Note: before you run the script you need to download the sonarqube zip from the UI, the site doesn't allow automated downloads:
+
+https://www.sonarsource.com/products/sonarqube/downloads/
+
+![sonar_download_manually](images/sonar_download_manually.png)
+
+The script must be placed in the same folder where the [jenkins_cicd_setup.sh](scripts/jenkins_cicd_setup.sh) script is located:
+
+![jenkins_cicd_setup_location](images/jenkins_cicd_setup_location.png)
+
+You can use the provided [jenkins_cicd_setup.sh](scripts/jenkins_cicd_setup.sh) bash script to provision a free tier ubuntu host with 30Gb of disk. Make sure the zip file name in the script matches with the sonarqube-*.zip that you download.
+
+The script will take care on your behalf of the following items:
 
 * Jenkins setup.
 * Nexus setup.
