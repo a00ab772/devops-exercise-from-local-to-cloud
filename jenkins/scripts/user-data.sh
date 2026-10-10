@@ -75,7 +75,7 @@ RestartSec=10
 WantedBy=multi-user.target
 EOT
 
-# Crear servicio nativo de Systemd para SonarQube
+# Create a native Systemd service for SonarQube
 cat << 'EOT' > /etc/systemd/system/sonarqube.service
 [Unit]
 Description=SonarQube service
@@ -95,6 +95,7 @@ LimitNPROC=4096
 WantedBy=multi-user.target
 EOT
 
+chown -R sonarqube:sonarqube /opt/sonarqube
 chmod +x /opt/sonarqube/bin/linux-x86-64/sonar.sh
 
 systemctl daemon-reload

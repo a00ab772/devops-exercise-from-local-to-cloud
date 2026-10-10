@@ -171,6 +171,9 @@ sudo tail -f /var/log/user-data.log
 sudo journalctl -xeu jenkins.service -n 50 --no-pager
 sudo journalctl -xeu nexus.service -n 50 --no-pager
 sudo journalctl -xeu sonarqube.service -n 50 --no-pager
+sudo tail -n 100 /opt/sonarqube/logs/sonar.log
+sudo tail -n 100 /opt/sonarqube/logs/es.log
+sudo ss -tulpn
 ```
 
 ![jenkins_cicd_ec2](images/jenkins_cicd_ec2.png)
@@ -180,7 +183,7 @@ Get the public dns of the EC2 instance:
 
 ![get_the_instance_public_dns](images/get_the_instance_public_dns.png)
 
-Install Jenkins Plugins:
+Enter Jenkins and install plugins:
 
 ![configure_jenkins_for_the_first_time](images/configure_jenkins_for_the_first_time.png)
 
@@ -188,11 +191,20 @@ Install Jenkins Plugins:
 
 ![configure_jenkins_for_the_first_time_02](images/configure_jenkins_for_the_first_time_02.png)
 
-Integrate Nexus and SonarQube with Jenkins:
+Enter Nexus and follow the initial steps:
 
 ![nexus_integration](images/nexus_integration.png)
 
+![nexus_integration_01](images/nexus_integration_01.png)
 
+![nexus_integration_02](images/nexus_integration_02.png)
+
+![nexus_integration_03](images/nexus_integration_03.png)
+
+Enter Sonarqube and follow the initial steps:
+
+
+* Integrate Nexus and SonarQube with Jenkins: 
 * Write the pipeline script.
 * Set notification if pipeline fails.
 

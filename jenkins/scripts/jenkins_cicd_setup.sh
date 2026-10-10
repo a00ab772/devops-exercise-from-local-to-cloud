@@ -167,7 +167,7 @@ RestartSec=10
 WantedBy=multi-user.target
 EOT
 
-# Crear servicio nativo de Systemd para SonarQube
+# Create a native Systemd service for SonarQube
 cat << 'EOT' > /etc/systemd/system/sonarqube.service
 [Unit]
 Description=SonarQube service
@@ -187,6 +187,7 @@ LimitNPROC=4096
 WantedBy=multi-user.target
 EOT
 
+chown -R sonarqube:sonarqube /opt/sonarqube
 chmod +x /opt/sonarqube/bin/linux-x86-64/sonar.sh
 
 systemctl daemon-reload
@@ -232,7 +233,7 @@ provision() {
 teardown() {
     log "Locating EC2 Instance with tag Name=$TAG_NAME..."
     INSTANCE_ID=$(aws ec2 describe-instances \
-        --filters "Name=tag:Name,Values=TAG_NAME" "Name=instance-state-name,Values=pending,running,stopped,stopping" \
+        --filters "Name=tag:Name,Values=$TAG_NAME" "Name=instance-state-name,Values=pending,running,stopped,stopping" \
         --query "Reservations[*].Instances[*].InstanceId" --output text --region "$AWS_REGION" 2>/dev/null || true)
 
     if [ -n "$INSTANCE_ID" ] && [ "$INSTANCE_ID" != "None" ]; then
