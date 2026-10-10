@@ -204,6 +204,8 @@ Enter Jenkins and install   plugins:
 
 ![configure_jenkins_for_the_first_time_02](images/configure_jenkins_for_the_first_time_02.png)
 
+![configure_jenkins_for_the_first_time_03](images/configure_jenkins_for_the_first_time_03.png)
+
 Enter Nexus and follow the initial steps:
 
 ![nexus_integration](images/nexus_integration.png)
@@ -229,6 +231,20 @@ Enter Jenkins and install the required plugins:
 ![jenkins_integration_plugins](images/jenkins_integration_plugins.png)
 
 
-* Write the pipeline script.
+* Write a pipeline script and run it
+
+![jenkins_pipeline_script_01](jenkins_pipeline_script_01.png)
+
+![jenkins_pipeline_script_02](jenkins_pipeline_script_02.png)
+
+![jenkins_pipeline_script_03](jenkins_pipeline_script_03.png)
+
+![jenkins_pipeline_script_04](jenkins_pipeline_script_04.png)
+
+* Run a Jenkinsfile from a github repo
+
+![jenkins_pipeline_from_Jenkinsfile](jenkins_pipeline_from_Jenkinsfile.png)
+
+
 * Set notification if pipeline fails.
 
