@@ -233,18 +233,20 @@ Enter Jenkins and install the required plugins:
 
 * Write a pipeline script and run it
 
-![jenkins_pipeline_script_01](jenkins_pipeline_script_01.png)
+![jenkins_pipeline_script_01](images/jenkins_pipeline_script_01.png)
 
-![jenkins_pipeline_script_02](jenkins_pipeline_script_02.png)
+![jenkins_pipeline_script_02](images/jenkins_pipeline_script_02.png)
 
-![jenkins_pipeline_script_03](jenkins_pipeline_script_03.png)
+![jenkins_pipeline_script_03](images/jenkins_pipeline_script_03.png)
 
-![jenkins_pipeline_script_04](jenkins_pipeline_script_04.png)
+![jenkins_pipeline_script_04](images/jenkins_pipeline_script_04.png)
 
 * Run a Jenkinsfile from a github repo
 
-![jenkins_pipeline_from_Jenkinsfile](jenkins_pipeline_from_Jenkinsfile.png)
+![jenkins_pipeline_from_Jenkinsfile](images/jenkins_pipeline_from_Jenkinsfile.png)
 
+![jenkins_pipeline_from_Jenkinsfile_01
+](images/jenkins_pipeline_from_Jenkinsfile_01.png)
 
 * Set notification if pipeline fails.
 
