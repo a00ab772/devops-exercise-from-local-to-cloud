@@ -16,9 +16,18 @@ The script must be placed in the same folder where the [jenkins_cicd_setup.sh](s
 
 ![jenkins_cicd_setup_location](images/jenkins_cicd_setup_location.png)
 
-You can use the provided [jenkins_cicd_setup.sh](scripts/jenkins_cicd_setup.sh) bash script to provision a free tier ubuntu host with 30Gb of disk. Make sure the zip file name in the script matches with the sonarqube-*.zip that you download.
+You can use one of the below provided scripts, both provisions ubuntu host with 30Gb of disk:
+* [jenkins_cicd_setup.sh](scripts/jenkins_cicd_setup.sh) provisions a t4g.micro EC2 instance, which is free tier but will take over your time and your nerves when you interact with the SonarQube service.
 
-The script will take care on your behalf of the following items:
+* [jenkins_cicd_setup_t4g.small.sh](scripts/jenkins_cicd_setup_t4g.small.sh) provisions a t4g.small EC2 instance, which is not free tier, but offers 2 GB RAM. It will cost you $0.0168 USD per hour in the us-east-1 region, but you will not suffer the sluggiest behaviour of the above configuration, but still the SonarQube will end up eating all the memory, and you will practically not be able to do much more than with the above.
+
+* [jenkins_cicd_setup_t4g.medium.sh](scripts/jenkins_cicd_setup_t4g.small.sh) provisions a t4g.medium EC2 instance, which is not free tier, but offers 4 GB RAM. It will cost you $0.0336 USD per hour in the us-east-1 region, but you will be confortably able to complete the lab.
+
+You decide!!!. My suggestion? Spin up the `jenkins_cicd_setup_t4g.medium.sh` approach, play around with the next steps below and then teardown the machine. It will not take you more than 1 hour to complete it.
+
+Before you run them, make sure the zip file name in the script matches with the sonarqube-*.zip that you download.
+
+Either of two scripts provided will take care on your behalf of the following items:
 
 * Jenkins setup.
 * Nexus setup.
@@ -201,7 +210,9 @@ Enter Nexus and follow the initial steps:
 
 ![nexus_integration_03](images/nexus_integration_03.png)
 
-Enter Sonarqube and follow the initial steps:
+Enter Sonarqube and follow the initial steps, note that you are using very limited host and you will need to wait for 5 minutes:
+
+![sonarqube_initialization](sonarqube_initialization.png)
 
 
 * Integrate Nexus and SonarQube with Jenkins: 

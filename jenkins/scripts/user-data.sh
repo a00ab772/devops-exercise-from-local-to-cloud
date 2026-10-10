@@ -4,14 +4,14 @@ exec > >(tee /var/log/user-data.log|logger) 2>&1
 
 log() { echo "[User-Data] $1"; }
 
-log "Configuring 2GB Swap space for t4g.micro..."
-fallocate -l 2G /swapfile
+log "Configuring 1GB Swap space as a safety buffer for t4g.medium..."
+fallocate -l 1G /swapfile
 chmod 600 /swapfile
 mkswap /swapfile
 swapon /swapfile
 echo '/swapfile none swap sw 0 0' >> /etc/fstab
 
-log "Updating system packages and installing prerequisites (unzip, curl, net-tools)..."
+log "Updating system packages and installing prerequisites..."
 apt-get update -y && apt-get upgrade -y
 apt-get install -y fontconfig openjdk-21-jre unzip curl net-tools groff
 
@@ -28,8 +28,15 @@ unzip -q /tmp/sonarqube.zip -d /tmp
 rm -rf /opt/sonarqube
 mv /tmp/sonarqube-* /opt/sonarqube
 chown -R sonarqube:sonarqube /opt/sonarqube
-chmod +x /opt/sonarqube/bin/linux-aarch64/sonar.sh
+chmod +x /opt/sonarqube/bin/linux-x86-64/sonar.sh
 rm -f /tmp/sonarqube.zip
+
+log "Tuning SonarQube JVM heap options for t4g.medium..."
+cat << 'EOT' >> /opt/sonarqube/conf/sonar.properties
+sonar.web.javaOpts=-Xmx512m -Xms256m -XX:+UseG1GC
+sonar.ce.javaOpts=-Xmx512m -Xms256m -XX:+UseG1GC
+sonar.search.javaOpts=-Xmx512m -Xms512m -XX:+UseG1GC
+EOT
 
 log "Installing Jenkins prerequisites and Jenkins..."
 mkdir -p /etc/apt/keyrings
@@ -46,16 +53,16 @@ NEXUS_URL="https://download.sonatype.com/nexus/3/nexus-3.77.2-02-unix.tar.gz"
 wget "$NEXUS_URL" -O nexus.tar.gz || wget "https://download.sonatype.com/nexus/3/latest-unix.tar.gz" -O nexus.tar.gz
 tar -xvf nexus.tar.gz && rm -rf nexus && mv nexus-3* nexus && chown -R nexus:nexus /opt/nexus
 
-# Configuring nexus user and forcing Java 17 usage to avoid install4j restrictions
 echo 'run_as_user="nexus"' > /opt/nexus/bin/nexus.rc
 echo 'INSTALL4J_JAVA_HOME="/usr/lib/jvm/java-17-openjdk-amd64"' >> /opt/nexus/bin/nexus.rc
+echo '-Xms512m' >> /opt/nexus/bin/nexus.vmoptions
+echo '-Xmx512m' >> /opt/nexus/bin/nexus.vmoptions
 echo '-Dinstall4j.javaHome=/usr/lib/jvm/java-17-openjdk-amd64' >> /opt/nexus/bin/nexus.vmoptions
 
 chown -R nexus:nexus /opt/nexus
 mkdir -p /opt/sonatype-work
 chown -R nexus:nexus /opt/sonatype-work
 
-# Crear servicio nativo de Systemd para Nexus
 cat << 'EOT' > /etc/systemd/system/nexus.service
 [Unit]
 Description=Nexus Service
@@ -75,7 +82,6 @@ RestartSec=10
 WantedBy=multi-user.target
 EOT
 
-# Create a native Systemd service for SonarQube
 cat << 'EOT' > /etc/systemd/system/sonarqube.service
 [Unit]
 Description=SonarQube service
