@@ -62,7 +62,7 @@ $ top
 Confirm that the Jenkins, ports are in use by the services:
 
 ```bash
-ubuntu@ip-172-31-35-180:~$ sudo ss -tulpn
+ubuntu@ip-172-*1-*35-180:~$ sudo ss -tulpn
 Netid             State              Recv-Q             Send-Q                               Local Address:Port                            Peer Address:Port             Process
 udp               UNCONN             0                  0                                       127.0.0.54:53                                   0.0.0.0:*                 users:(("systemd-resolve",pid=326,fd=16))
 udp               UNCONN             0                  0                                    127.0.0.53%lo:53                                   0.0.0.0:*                 users:(("systemd-resolve",pid=326,fd=14))
@@ -84,11 +84,11 @@ tcp               LISTEN             0                  50                      
 Check the installation log:
 
 ```bash
-ubuntu@ip-172-31-35-180:~$ sudo tail -f /var/log/user-data.log
+ubuntu@ip-172-*1-*35-180:~$ sudo tail -f /var/log/user-data.log
 [User-Data] Setting up daily shutdown cron job...
-++ curl -s http://169.254.169.254/latest/meta-data/instance-id
+++ curl -s http://169.**.***.254/latest/meta-data/instance-id
 + INSTANCE_ID=
-++ curl -s http://169.254.169.254/latest/meta-data/placement/region
+++ curl -s http://169.**.***.254/latest/meta-data/placement/region
 + REGION=
 + echo '0 0 * * * root aws ec2 stop-instances --instance-ids  --region '
 + chmod 644 /etc/cron.d/daily-shutdown
@@ -102,7 +102,7 @@ ubuntu@ip-172-31-35-180:~$ sudo tail -f /var/log/user-data.log
 Check the services are running
 
 ```bash
-ubuntu@ip-172-31-35-180:~$ sudo systemctl status jenkins
+ubuntu@ip-172-*1-*35-180:~$ sudo systemctl status jenkins
 ● jenkins.service - Jenkins Continuous Integration Server
      Loaded: loaded (/usr/lib/systemd/system/jenkins.service; enabled; preset: enabled)
      Active: active (running) since Fri 2026-10-09 16:10:53 UTC; 1min 5s ago
@@ -113,19 +113,19 @@ ubuntu@ip-172-31-35-180:~$ sudo systemctl status jenkins
      CGroup: /system.slice/jenkins.service
              └─9701 /usr/bin/java -Djava.awt.headless=true -jar /usr/share/java/jenkins.war --webroot=/var/cache/jenkins/war --httpPort=8080
 
-Oct 09 16:10:48 ip-172-31-35-180 jenkins[9701]: [LF]> This may also be found at: /var/lib/jenkins/secrets/initialAdminPassword
-Oct 09 16:10:48 ip-172-31-35-180 jenkins[9701]: [LF]>
-Oct 09 16:10:48 ip-172-31-35-180 jenkins[9701]: [LF]> *************************************************************
-Oct 09 16:10:48 ip-172-31-35-180 jenkins[9701]: [LF]> *************************************************************
-Oct 09 16:10:48 ip-172-31-35-180 jenkins[9701]: [LF]> *************************************************************
-Oct 09 16:10:53 ip-172-31-35-180 jenkins[9701]: 2026-10-09 16:10:53.122+0000 [id=34]        INFO        jenkins.InitReactorRunner$1#onAttained: Completed initialization
-Oct 09 16:10:53 ip-172-31-35-180 jenkins[9701]: 2026-10-09 16:10:53.215+0000 [id=24]        INFO        hudson.lifecycle.Lifecycle#onReady: Jenkins is fully up and running
-Oct 09 16:10:53 ip-172-31-35-180 systemd[1]: Started jenkins.service - Jenkins Continuous Integration Server.
-Oct 09 16:10:53 ip-172-31-35-180 jenkins[9701]: 2026-10-09 16:10:53.360+0000 [id=50]        INFO        h.m.DownloadService$Downloadable#load: Obtained the updated data file for hudson.tasks.Maven.MavenInstaller
-Oct 09 16:10:53 ip-172-31-35-180 jenkins[9701]: 2026-10-09 16:10:53.363+0000 [id=50]        INFO        hudson.util.Retrier#start: Performed the action check updates server successfully at the attempt #1
-ubuntu@ip-172-31-35-180:~$ ^C
-ubuntu@ip-172-31-35-180:~$
-ubuntu@ip-172-31-35-180:~$ sudo systemctl status nexus
+Oct 09 16:10:48 ip-172-*1-*35-180 jenkins[9701]: [LF]> This may also be found at: /var/lib/jenkins/secrets/initialAdminPassword
+Oct 09 16:10:48 ip-172-*1-*35-180 jenkins[9701]: [LF]>
+Oct 09 16:10:48 ip-172-*1-*35-180 jenkins[9701]: [LF]> *************************************************************
+Oct 09 16:10:48 ip-172-*1-*35-180 jenkins[9701]: [LF]> *************************************************************
+Oct 09 16:10:48 ip-172-*1-*35-180 jenkins[9701]: [LF]> *************************************************************
+Oct 09 16:10:53 ip-172-*1-*35-180 jenkins[9701]: 2026-10-09 16:10:53.122+0000 [id=34]        INFO        jenkins.InitReactorRunner$1#onAttained: Completed initialization
+Oct 09 16:10:53 ip-172-*1-*35-180 jenkins[9701]: 2026-10-09 16:10:53.215+0000 [id=24]        INFO        hudson.lifecycle.Lifecycle#onReady: Jenkins is fully up and running
+Oct 09 16:10:53 ip-172-*1-*35-180 systemd[1]: Started jenkins.service - Jenkins Continuous Integration Server.
+Oct 09 16:10:53 ip-172-*1-*35-180 jenkins[9701]: 2026-10-09 16:10:53.360+0000 [id=50]        INFO        h.m.DownloadService$Downloadable#load: Obtained the updated data file for hudson.tasks.Maven.MavenInstaller
+Oct 09 16:10:53 ip-172-*1-*35-180 jenkins[9701]: 2026-10-09 16:10:53.363+0000 [id=50]        INFO        hudson.util.Retrier#start: Performed the action check updates server successfully at the attempt #1
+ubuntu@ip-172-*1-*35-180:~$ ^C
+ubuntu@ip-172-*1-*35-180:~$
+ubuntu@ip-172-*1-*35-180:~$ sudo systemctl status nexus
 ● nexus.service - Nexus Service
      Loaded: loaded (/etc/systemd/system/nexus.service; enabled; preset: enabled)
      Active: active (running) since Fri 2026-10-09 16:11:15 UTC; 56s ago
@@ -136,13 +136,13 @@ ubuntu@ip-172-31-35-180:~$ sudo systemctl status nexus
      CGroup: /system.slice/nexus.service
              └─10613 /usr/lib/jvm/java-1.17.0-openjdk-amd64/bin/java -server -Dinstall4j.jvmDir=/usr/lib/jvm/java-1.17.0-openjdk-amd64 -Dexe4j.moduleName=/opt/nexus/bin/nexus -XX:+UnlockDiagnosticVMOptions -Dinstall4j.launcherId=246 -Di>
 
-Oct 09 16:11:14 ip-172-31-35-180 systemd[1]: Starting nexus.service - Nexus Service...
-Oct 09 16:11:15 ip-172-31-35-180 nexus[10246]: Starting nexus
-Oct 09 16:11:15 ip-172-31-35-180 systemd[1]: Started nexus.service - Nexus Service.
+Oct 09 16:11:14 ip-172-*1-*35-180 systemd[1]: Starting nexus.service - Nexus Service...
+Oct 09 16:11:15 ip-172-*1-*35-180 nexus[10246]: Starting nexus
+Oct 09 16:11:15 ip-172-*1-*35-180 systemd[1]: Started nexus.service - Nexus Service.
 
-ubuntu@ip-172-31-35-180:~$
-ubuntu@ip-172-31-35-180:~$
-ubuntu@ip-172-31-35-180:~$ sudo systemctl status sonarqube
+ubuntu@ip-172-*1-*35-180:~$
+ubuntu@ip-172-*1-*35-180:~$
+ubuntu@ip-172-*1-*35-180:~$ sudo systemctl status sonarqube
 ● sonarqube.service - SonarQube service
      Loaded: loaded (/etc/systemd/system/sonarqube.service; enabled; preset: enabled)
      Active: active (running) since Fri 2026-10-09 16:11:15 UTC; 1min 4s ago
@@ -156,38 +156,43 @@ ubuntu@ip-172-31-35-180:~$ sudo systemctl status sonarqube
              ├─10742 /usr/lib/jvm/java-21-openjdk-amd64/bin/java -Xms4m -Xmx64m -XX:+UseSerialGC -cp "/opt/sonarqube/elasticsearch/lib/tools/server-launcher/*" org.elasticsearch.server.launcher.ServerLauncher
              └─10823 /usr/lib/jvm/java-21-openjdk-amd64/bin/java -Des.networkaddress.cache.ttl=60 -Des.networkaddress.cache.negative.ttl=10 -XX:+AlwaysPreTouch -Xss1m -Djava.awt.headless=true -Dfile.encoding=UTF-8 -Djna.nosys=true -XX:->
 
-Oct 09 16:11:15 ip-172-31-35-180 systemd[1]: Starting sonarqube.service - SonarQube service...
-Oct 09 16:11:15 ip-172-31-35-180 sonar.sh[10673]: /usr/bin/java
-Oct 09 16:11:15 ip-172-31-35-180 sonar.sh[10673]: Starting SonarQube...
-Oct 09 16:11:15 ip-172-31-35-180 sonar.sh[10673]: Started SonarQube.
-Oct 09 16:11:15 ip-172-31-35-180 systemd[1]: Started sonarqube.service - SonarQube service.
+Oct 09 16:11:15 ip-172-*1-*35-180 systemd[1]: Starting sonarqube.service - SonarQube service...
+Oct 09 16:11:15 ip-172-*1-*35-180 sonar.sh[10673]: /usr/bin/java
+Oct 09 16:11:15 ip-172-*1-*35-180 sonar.sh[10673]: Starting SonarQube...
+Oct 09 16:11:15 ip-172-*1-*35-180 sonar.sh[10673]: Started SonarQube.
+Oct 09 16:11:15 ip-172-*1-*35-180 systemd[1]: Started sonarqube.service - SonarQube service.
 
 ```
 
 If any of the services has trouble, check the journal log:
 
 ```bash
-sudo journalctl -u jenkins.service -n 50 --no-pager
-sudo journalctl -u nexus.service -n 50 --no-pager
-sudo journalctl -u sonarqube.service -n 50 --no-pager
+sudo tail -f /var/log/user-data.log
+sudo journalctl -xeu jenkins.service -n 50 --no-pager
+sudo journalctl -xeu nexus.service -n 50 --no-pager
+sudo journalctl -xeu sonarqube.service -n 50 --no-pager
 ```
 
 ![jenkins_cicd_ec2](images/jenkins_cicd_ec2.png)
 
-Be aware that you may be interested in using a t4g.micro or using more than one ec2 instance, or a medium size image:
 
-![machine_is_too_busy](images/machine_is_too_busy.png)
-
-Enter instance and get the public dns:
+Get the public dns of the EC2 instance:
 
 ![get_the_instance_public_dns](images/get_the_instance_public_dns.png)
 
-Configure Jenkins for the first time:
+Install Jenkins Plugins:
 
 ![configure_jenkins_for_the_first_time](images/configure_jenkins_for_the_first_time.png)
 
-* Plugins installation.
-* Integrate Nexus and SonarQube with Jenkins.
+![configure_jenkins_for_the_first_time_01](images/configure_jenkins_for_the_first_time_01.png)
+
+![configure_jenkins_for_the_first_time_02](images/configure_jenkins_for_the_first_time_02.png)
+
+Integrate Nexus and SonarQube with Jenkins:
+
+![nexus_integration](images/nexus_integration.png)
+
+
 * Write the pipeline script.
 * Set notification if pipeline fails.
 

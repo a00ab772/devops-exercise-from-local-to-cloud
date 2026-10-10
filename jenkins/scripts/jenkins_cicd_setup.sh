@@ -96,7 +96,7 @@ exec > >(tee /var/log/user-data.log|logger) 2>&1
 
 log() { echo "[User-Data] \$1"; }
 
-log "Configuring 2GB Swap space for t3.micro..."
+log "Configuring 2GB Swap space for t4g.micro..."
 fallocate -l 2G /swapfile
 chmod 600 /swapfile
 mkswap /swapfile
@@ -107,8 +107,8 @@ log "Updating system packages and installing prerequisites (unzip, curl, net-too
 apt-get update -y && apt-get upgrade -y
 apt-get install -y fontconfig openjdk-21-jre unzip curl net-tools groff
 
-log "Installing official AWS CLI v2..."
-curl -s "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "/tmp/awscliv2.zip"
+log "Installing official AWS CLI v2 for ARM64..."
+curl -s "https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip" -o "/tmp/awscliv2.zip"
 unzip -q /tmp/awscliv2.zip -d /tmp
 /tmp/aws/install
 rm -rf /tmp/awscliv2.zip /tmp/aws
@@ -120,7 +120,7 @@ unzip -q /tmp/sonarqube.zip -d /tmp
 rm -rf /opt/sonarqube
 mv /tmp/sonarqube-* /opt/sonarqube
 chown -R sonarqube:sonarqube /opt/sonarqube
-chmod +x /opt/sonarqube/bin/linux-x86-64/sonar.sh
+chmod +x /opt/sonarqube/bin/linux-aarch64/sonar.sh
 rm -f /tmp/sonarqube.zip
 
 log "Installing Jenkins prerequisites and Jenkins..."
@@ -187,6 +187,8 @@ LimitNPROC=4096
 WantedBy=multi-user.target
 EOT
 
+chmod +x /opt/sonarqube/bin/linux-x86-64/sonar.sh
+
 systemctl daemon-reload
 systemctl enable --now nexus
 systemctl enable --now sonarqube
@@ -207,7 +209,7 @@ provision() {
     generate_user_data
 
     log "Fetching latest Ubuntu AMI..."
-    AMI_ID=$(aws ec2 describe-images --region "$AWS_REGION" --owners 099720109477 --filters "Name=name,Values=ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-amd64-server-*" "Name=state,Values=available" --query "sort_by(Images, &CreationDate)[-1].ImageId" --output text)
+    AMI_ID=$(aws ec2 describe-images --region "$AWS_REGION" --owners 099720109477 --filters "Name=name,Values=ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-arm64-server-*" "Name=state,Values=available" --query "sort_by(Images, &CreationDate)[-1].ImageId" --output text)
 
     log "Waiting 10 seconds for IAM profile propagation to EC2..."
     sleep 10
@@ -230,7 +232,7 @@ provision() {
 teardown() {
     log "Locating EC2 Instance with tag Name=$TAG_NAME..."
     INSTANCE_ID=$(aws ec2 describe-instances \
-        --filters "Name=tag:Name,Values=$TAG_NAME" "Name=instance-state-name,Values=pending,running,stopped,stopping" \
+        --filters "Name=tag:Name,Values=TAG_NAME" "Name=instance-state-name,Values=pending,running,stopped,stopping" \
         --query "Reservations[*].Instances[*].InstanceId" --output text --region "$AWS_REGION" 2>/dev/null || true)
 
     if [ -n "$INSTANCE_ID" ] && [ "$INSTANCE_ID" != "None" ]; then
@@ -257,10 +259,12 @@ teardown() {
         log "$EXISTING_BUCKET bucket doesn't exist."
     fi
 
-    log "Deleting Security Group..."
+log "Deleting Security Group..."
     SG_ID=$(aws ec2 describe-security-groups --group-names "$SECURITY_GROUP_NAME" --region "$AWS_REGION" --query 'SecurityGroups[0].GroupId' --output text 2>/dev/null || true)
     if [ -n "$SG_ID" ] && [ "$SG_ID" != "None" ]; then
-        aws ec2 delete-security-group --group-id "$SG_ID" --region "$AWS_REGION" >/dev/null || log "Warning: Could not delete security group immediately (may require dependency release)."
+        log "Waiting for network interfaces to detach..."
+        sleep 10
+        aws ec2 delete-security-group --group-id "$SG_ID" --region "$AWS_REGION" >/dev/null || log "Warning: Could not delete security group immediately."
     fi
 
     log "Cleaning up IAM Profile and Role..."
