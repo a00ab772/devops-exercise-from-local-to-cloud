@@ -1,63 +1,60 @@
 pipeline {
-	agent any
-	tools {
+    agent any
+    tools {
         maven "Maven 3.8.7"
         jdk "JDK-21"
-	}
+    }
 
-	stages {
-	    stage('Fetch code') {
+    stages {
+        stage('Fetch code') {
             steps {
                 git branch: 'main', url: 'https://github.com/a00ab772/devops-exercise-from-local-to-cloud.git'
             }
+        }
 
-	    }
+        stage('Build') {
+            steps {
+                sh 'mvn install -DskipTests'
+            }
+            post {
+                success {
+                    echo 'Now Archiving it...'
+                    archiveArtifacts artifacts: '**/target/*.war'
+                }
+            }
+        }
 
-	    stage('Build'){
-	        steps{
-	           sh 'mvn install -DskipTests'
-	        }
-
-	        post {
-	           success {
-	              echo 'Now Archiving it...'
-	              archiveArtifacts artifacts: '**/target/*.war'
-	           }
-	        }
-	    }
-
-
-	    stage('UNIT TEST') {
-            steps{
+        stage('UNIT TEST') {
+            steps {
                 sh 'mvn test'
             }
         }
 
         stage('Checkstyle Analysis') {
-            steps{
+            steps {
                 sh 'mvn checkstyle:checkstyle'
             }
         }
 
         stage('Sonar Code analysis') {
-          environment {
-           scannerHome = tool 'sonar8.1.0';
-          }
-
-          steps{
-            withSonarQubeEnv('sonarserver') {
-              sh '''${scannerHome}/bin/sonar-scanner \
-                  -Dsonar.projectKey=vprofile \
-                  -Dsonar.projectName=vprofile \
-                  -Dsonar.projectVersion=1.0 \
-                  -Dsonar.sources=src/ \
-                  -Dsonar.java.binaries=target/classes \
-                  -Dsonar.junit.reportsPath=target/surefire-reports \
-                  -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml \
-                  -Dsonar.java.checkstyle.reportPaths=target/checkstyle-result.xml \
-                  -Dsonar.javascript.skip=true'''
+            environment {
+                scannerHome = tool 'sonar8.1.0'
             }
-          }
+            steps {
+                withSonarQubeEnv('sonarserver') {
+                    sh '''${scannerHome}/bin/sonar-scanner \
+                        -Dsonar.projectKey=vprofile \
+                        -Dsonar.projectName=vprofile \
+                        -Dsonar.projectVersion=1.0 \
+                        -Dsonar.sources=src/ \
+                        -Dsonar.java.binaries=target/classes \
+                        -Dsonar.junit.reportsPath=target/surefire-reports \
+                        -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml \
+                        -Dsonar.java.checkstyle.reportPaths=target/checkstyle-result.xml \
+                        -Dsonar.exclusions="**/*.js,**/*.ts,**/*.css,**/*.html" \
+                        -Dsonar.javascript.skip=true'''
+                }
+            }
         }
-	}
+    }
 }

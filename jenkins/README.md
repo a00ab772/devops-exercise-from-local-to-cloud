@@ -277,6 +277,8 @@ Integrate SonarQube in Jenkins following the below steps:
 
 ![jenkins_sonarqube_integration_04](images/jenkins_sonarqube_integration_04.png)
 
+The SonarQube url will change every time you re-start this EC2 instance, hence be aware that you will be required to update this configuration to maintain it, unless you add an Application Load Balancer, which i didn't to keep costs as low as possible:
+
 ![jenkins_sonarqube_integration_05](images/jenkins_sonarqube_integration_05.png)
 
 # Run a SonarQube pipeline that checks the code style
@@ -297,4 +299,12 @@ This pipeline generates the checkstyle report, that will be interpreted by the S
 Copy the content in the [scripts/Jenkinsfile_sonarqube_analysis](scripts/Jenkinsfile_sonarqube_analysis) file and paste it in the below window:
 
 
-![jenkins_checkstyle_sent_to_sonarqube](jenkins_checkstyle_sent_to_sonarqube.png)
+![jenkins_checkstyle_sent_to_sonarqube](images/jenkins_checkstyle_sent_to_sonarqube.png)
+
+Run the pipeline:
+
+![jenkins_checkstyle_sent_to_sonarqube_01](images/jenkins_checkstyle_sent_to_sonarqube_01.png)
+
+Click the link and you will see the SonarQube report:
+
+![jenkins_checkstyle_sent_to_sonarqube_02](images/jenkins_checkstyle_sent_to_sonarqube_02.png)
