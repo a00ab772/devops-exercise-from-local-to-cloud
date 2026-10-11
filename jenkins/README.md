@@ -308,3 +308,31 @@ Run the pipeline:
 Click the link and you will see the SonarQube report:
 
 ![jenkins_checkstyle_sent_to_sonarqube_02](images/jenkins_checkstyle_sent_to_sonarqube_02.png)
+
+This went throught because we haven't yet set the Quality Gates, let's go to it.
+
+# Setup SonarQube quality gates
+
+Let's setup how much errors that we can tolerate.
+
+![sonarqube_quality_gate](images/sonarqube_quality_gate.png)
+
+![sonarqube_quality_gate_01](images/sonarqube_quality_gate_01.png)
+
+![sonarqube_quality_gate_02](images/sonarqube_quality_gate_02.png)
+
+Now use the new SonarQube quality gate in your Jenkins pipeline pipeline, here is the updated file:
+
+[scripts/Jenkinsfile_sonarqube_analysis_quality_gate](scripts/Jenkinsfile_sonarqube_analysis_quality_gate)
+
+Next, allow a webhook so that SonarQube can contact Jenkins after the analysis is complete:
+
+![Jenkinsfile_sonarqube_analysis_quality_gate_01](images/Jenkinsfile_sonarqube_analysis_quality_gate_01.png)
+
+As you can see, the quality gate blocked the pipeline:
+
+![Jenkinsfile_sonarqube_analysis_quality_gate_02](images/Jenkinsfile_sonarqube_analysis_quality_gate_02.png)
+
+The reason is the number of failures limit was overpassed:
+
+![Jenkinsfile_sonarqube_analysis_quality_gate_03](Jenkinsfile_sonarqube_analysis_quality_gate_03.png)
