@@ -4,7 +4,7 @@ In this section, we will provide a detailed explanation of how we implement CI/C
 
 ![jenkins_continuous_integration.drawio.png](images/jenkins_continuous_integration.drawio.png)
 
-# Jenkins CI setup
+# CI environment setup 
 
 Note: before you run the script you need to download the sonarqube zip from the UI, the site doesn't allow automated downloads:
 
@@ -42,27 +42,40 @@ Either of two scripts provided will take care on your behalf of the following it
 
 user@DESKTOP-SCNMK3I UCRT64 ~/Documents/devops-exercise-from-local-to-cloud/jenkins/scripts (main)
 Fri Oct 09 12:15:57
-$ ./jenkins_cicd_setup.sh
-Usage: ./jenkins_cicd_setup.sh {provision|teardown}
+$ ./jenkins_cicd_setup_two_t4g.small.sh
+Usage: ./jenkins_cicd_setup_two_t4g.small.sh {provision|teardown|update-ip}
+
+Options:
+  provision  : Deploys IAM roles, S3 bucket, Security Group, and EC2 instances.
+  teardown   : Terminates EC2 instances and cleans up AWS resources.
+  update-ip  : Fetches your local machine's current public IP via curl,
+               clears out stale ingress rules in the Security Group, and
+               authorizes the new IP for ports 22, 8080, 8081, and 9000.
+
 
 user@DESKTOP-SCNMK3I UCRT64 ~/Documents/devops-exercise-from-local-to-cloud/jenkins/scripts (main)
-Fri Oct 09 12:17:16
-$ ./jenkins_cicd_setup.sh provision
-[2026-10-09 17:30:46] Checking/Creating Security Group...
-[2026-10-09 17:30:49] Fetching your public IP address...
-[2026-10-09 17:30:49] Restricting inbound access to your IP: 8*.**6.240.132/32
-[2026-10-09 17:30:49] Opening inbound ports...
-[2026-10-09 17:30:55] Checking/Configuring IAM Instance Profile...
-[2026-10-09 17:31:02] Waiting for IAM instance profile propagation...
-[2026-10-09 17:31:05] The zip file already exists in the s3://jenkins-sonarqube-binaries-22851/ S3 bucket and it is accessible. We skip the upload to save costs.
-[2026-10-09 17:31:05] Fetching latest Ubuntu AMI...
-[2026-10-09 17:31:06] Waiting 10 seconds for IAM profile propagation to EC2...
-[2026-10-09 17:31:16] Launching EC2 Instance with 30GB gp3 storage...
-[2026-10-09 17:31:19] Successfully provisioned instance ID: i-063***********1dc
-
+Sun Oct 11 07:16:34
+$ ./jenkins_cicd_setup_two_t4g.small.sh provision
+[2026-10-11 07:16:41] Checking/Creating Security Group...
+[2026-10-11 07:16:46] Locating Security Group: jenkins-devsecops-sg...
+[2026-10-11 07:16:47] Fetching your local public IP address...
+[2026-10-11 07:16:48] Current local public IP resolved to: 84.125.125.98/32
+[2026-10-11 07:16:48] Revoking existing inbound rules for ports 22, 8080, 8081, 9000...
+[2026-10-11 07:16:49] Authorizing new inbound access for your IP: 84.125.125.98/32...
+[2026-10-11 07:16:58] Security group successfully updated with IP 84.125.125.98/32!
+[2026-10-11 07:16:58] Checking/Configuring IAM Instance Profile...
+[2026-10-11 07:17:09] Waiting for IAM instance profile propagation...
+[2026-10-11 07:17:14] The zip file already exists in s3://jenkins-sonarqube-binaries-22254/. Skipping upload.
+[2026-10-11 07:17:14] Fetching latest Ubuntu ARM64 AMI...
+[2026-10-11 07:17:16] Waiting 10 seconds for IAM profile propagation...
+[2026-10-11 07:17:27] Launching Instance 1: Jenkins & Nexus (t4g.small)...
+[2026-10-11 07:17:30] Launching Instance 2: SonarQube (t4g.small)...
+[2026-10-11 07:17:33] Successfully provisioned instances!
+[2026-10-11 07:17:33] Jenkins & Nexus Instance ID:i-063***********1dc
+[2026-10-11 07:17:33] SonarQube Instance ID: i-423***********1
 ```
 
-Connect to the instance and check the memory consumption:
+Connect to the instances and check the memory consumption:
 
 ```bash
 user@DESKTOP-SCNMK3I UCRT64 ~/Documents/devops-exercise-from-local-to-cloud/jenkins/scripts (main)
@@ -196,7 +209,7 @@ Get the public dns of the EC2 instance:
 
 ![get_the_instance_public_dns](images/get_the_instance_public_dns.png)
 
-Enter Jenkins and install   plugins:
+Enter Jenkins and install plugins:
 
 ![configure_jenkins_for_the_first_time](images/configure_jenkins_for_the_first_time.png)
 
@@ -231,7 +244,11 @@ Enter Jenkins and install the required plugins:
 ![jenkins_integration_plugins](images/jenkins_integration_plugins.png)
 
 
-* Write a pipeline script and run it
+# Run your first Jenkins pipelines
+
+Write a pipeline script and run it; you can see one example in the provided [Jenkinsfile](../Jenkinsfile):
+
+You can copy the content and paste in a Jenkins pipeline as below:
 
 ![jenkins_pipeline_script_01](images/jenkins_pipeline_script_01.png)
 
@@ -241,12 +258,43 @@ Enter Jenkins and install the required plugins:
 
 ![jenkins_pipeline_script_04](images/jenkins_pipeline_script_04.png)
 
-* Run a Jenkinsfile from a github repo
+Or else, you can make the Jenkins pipeline pick it up directly from your github repo:
 
 ![jenkins_pipeline_from_Jenkinsfile](images/jenkins_pipeline_from_Jenkinsfile.png)
 
 ![jenkins_pipeline_from_Jenkinsfile_01
 ](images/jenkins_pipeline_from_Jenkinsfile_01.png)
 
-* Set notification if pipeline fails.
+# Add SonarQube code analysis to your Jenkins pipelines
 
+Integrate SonarQube in Jenkins following the below steps:
+
+![jenkins_sonarqube_integration_01](images/jenkins_sonarqube_integration_01.png)
+
+![jenkins_sonarqube_integration_02](images/jenkins_sonarqube_integration_02.png)
+
+![jenkins_sonarqube_integration_03](images/jenkins_sonarqube_integration_03.png)
+
+![jenkins_sonarqube_integration_04](images/jenkins_sonarqube_integration_04.png)
+
+![jenkins_sonarqube_integration_05](images/jenkins_sonarqube_integration_05.png)
+
+# Run a SonarQube pipeline that checks the code style
+
+Copy the content in the [scripts/Jenkinsfile_checkstyle](scripts/Jenkinsfile_checkstyle) file and paste it in the below window:
+
+![jenkins_checkstyle](images/jenkins_checkstyle.png)
+
+![jenkins_checkstyle_01](images/jenkins_checkstyle_01.png)
+
+
+This pipeline generates the checkstyle report, that will be interpreted by the SonarQube dashboard:
+
+![jenkins_checkstyle_02](images/jenkins_checkstyle_02.png)
+
+# Run a SonarQube pipeline that sends the checkstile analysis to SonarQube
+
+Copy the content in the [scripts/Jenkinsfile_sonarqube_analysis](scripts/Jenkinsfile_sonarqube_analysis) file and paste it in the below window:
+
+
+![jenkins_checkstyle_sent_to_sonarqube](jenkins_checkstyle_sent_to_sonarqube.png)

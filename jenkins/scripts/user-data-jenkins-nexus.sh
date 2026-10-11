@@ -13,17 +13,20 @@ echo '/swapfile none swap sw 0 0' >> /etc/fstab
 
 log "Updating system packages and installing prerequisites..."
 apt-get update -y && apt-get upgrade -y
-apt-get install -y fontconfig openjdk-21-jre unzip curl net-tools groff
+apt-get install -y fontconfig openjdk-21-jdk unzip curl net-tools groff maven tree
 
-log "Installing Jenkins prerequisites and Jenkins..."
+log "Installing Jenkins prerequisites and Node.js 20 LTS..."
 mkdir -p /etc/apt/keyrings
 curl -fsSL https://pkg.jenkins.io/debian-stable/jenkins.io-2026.key | tee /etc/apt/keyrings/jenkins-keyring.asc > /dev/null
 echo deb [signed-by=/etc/apt/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian-stable binary/ | tee /etc/apt/sources.list.d/jenkins.list > /dev/null
-apt-get update -y && apt-get install -y jenkins
+
+curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+
+apt-get update -y && apt-get install -y nodejs jenkins
 systemctl enable --now jenkins
 
 log "Installing Nexus prerequisites (Java 17) and Nexus OSS..."
-apt-get install -y openjdk-17-jre
+apt-get install -y openjdk-17-jdk
 cd /opt
 useradd -r -M -d /opt/nexus -s /bin/false nexus || true
 NEXUS_URL="https://download.sonatype.com/nexus/3/nexus-3.77.2-02-unix.tar.gz"

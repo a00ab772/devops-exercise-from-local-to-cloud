@@ -17,8 +17,54 @@ log() {
 }
 
 usage() {
-    echo "Usage: $0 {provision|teardown}"
+    echo "Usage: $0 {provision|teardown|update-ip}"
+    echo
+    echo "Options:"
+    echo "  provision  : Deploys IAM roles, S3 bucket, Security Group, and EC2 instances."
+    echo "  teardown   : Terminates EC2 instances and cleans up AWS resources."
+    echo "  update-ip  : Fetches your local machine's current public IP via curl,"
+    echo "               clears out stale ingress rules in the Security Group, and"
+    echo "               authorizes the new IP (ports 22, 8080, 8081, 9000) plus"
+    echo "               self-referencing traffic between instances."
     exit 1
+}
+
+update_security_group_ip() {
+    log "Locating Security Group: $SECURITY_GROUP_NAME..."
+    SG_ID=$(aws ec2 describe-security-groups --group-names "$SECURITY_GROUP_NAME" --region "$AWS_REGION" --query 'SecurityGroups[0].GroupId' --output text 2>/dev/null || true)
+
+    if [ -z "$SG_ID" ] || [ "$SG_ID" == "None" ]; then
+        log "Security group '$SECURITY_GROUP_NAME' does not exist yet. Run 'provision' first."
+        return 1
+    fi
+
+    log "Fetching your local public IP address..."
+    MY_IP=$(curl -s http://checkip.amazonaws.com || curl -s ifconfig.me)
+    if [ -z "$MY_IP" ]; then
+        log "Error: Failed to fetch public IP address."
+        exit 1
+    fi
+    MY_IP_CIDR="${MY_IP}/32"
+    log "Current local public IP resolved to: $MY_IP_CIDR"
+
+    log "Revoking existing inbound rules..."
+    EXISTING_RULES=$(aws ec2 describe-security-groups --group-ids "$SG_ID" --region "$AWS_REGION" --query 'SecurityGroups[0].IpPermissions' --output json)
+
+    if [ "$EXISTING_RULES" != "[]" ] && [ -n "$EXISTING_RULES" ]; then
+        aws ec2 revoke-security-group-ingress --group-id "$SG_ID" --ip-permissions "$EXISTING_RULES" --region "$AWS_REGION" >/dev/null || true
+    fi
+
+    log "Authorizing inbound access for your IP ($MY_IP_CIDR) on ports 22, 8080, 8081, 9000..."
+    for port in 22 8080 8081 9000; do
+        aws ec2 authorize-security-group-ingress --group-id "$SG_ID" --protocol tcp --port "$port" --cidr "$MY_IP_CIDR" --region "$AWS_REGION" >/dev/null
+    done
+
+    log "Authorizing self-referencing internal traffic for ports 8080, 8081, 9000..."
+    for port in 8080 8081 9000; do
+        aws ec2 authorize-security-group-ingress --group-id "$SG_ID" --protocol tcp --port "$port" --source-group "$SG_ID" --region "$AWS_REGION" >/dev/null
+    done
+
+    log "Security group successfully updated!"
 }
 
 create_security_group() {
@@ -27,18 +73,9 @@ create_security_group() {
         SG_ID=$(aws ec2 create-security-group --group-name "$SECURITY_GROUP_NAME" \
             --description "SG for Split Jenkins/Nexus and SonarQube POC" \
             --query 'GroupId' --output text --region "$AWS_REGION")
-
-        log "Fetching your public IP address..."
-        MY_IP=$(curl -s http://checkip.amazonaws.com)
-        MY_IP_CIDR="${MY_IP}/32"
-        log "Restricting inbound access to your IP: $MY_IP_CIDR"
-
-        log "Opening inbound ports (SSH: 22, Jenkins: 8080, Nexus: 8081, SonarQube: 9000)..."
-        for port in 22 8080 8081 9000; do
-            aws ec2 authorize-security-group-ingress --group-id "$SG_ID" --protocol tcp --port "$port" --cidr "$MY_IP_CIDR" --region "$AWS_REGION" >/dev/null
-        done
     fi
 
+    update_security_group_ip
     echo "$SG_ID"
 }
 
@@ -104,10 +141,15 @@ log "Updating system packages and installing prerequisites..."
 apt-get update -y && apt-get upgrade -y
 apt-get install -y fontconfig openjdk-21-jdk unzip curl net-tools groff maven tree
 
-log "Installing Jenkins prerequisites and Jenkins..."
+log "Installing Jenkins prerequisites and stable Node.js 20..."
 mkdir -p /etc/apt/keyrings
 curl -fsSL https://pkg.jenkins.io/debian-stable/jenkins.io-2026.key | tee /etc/apt/keyrings/jenkins-keyring.asc > /dev/null
 echo deb [signed-by=/etc/apt/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian-stable binary/ | tee /etc/apt/sources.list.d/jenkins.list > /dev/null
+
+curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+apt-get install -y nodejs=20.11.0-1nodesource1
+apt-mark hold nodejs
+
 apt-get update -y && apt-get install -y jenkins
 systemctl enable --now jenkins
 
@@ -339,6 +381,9 @@ case "${1:-}" in
         ;;
     teardown)
         teardown
+        ;;
+    update-ip)
+        update_security_group_ip
         ;;
     *)
         usage
