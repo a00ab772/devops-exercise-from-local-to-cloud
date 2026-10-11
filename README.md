@@ -17,7 +17,7 @@ The application architecture consists of all these services, and we will be sett
 
 ![Application architecture diagram](images/architecture.drawio.png)
 
-[(Source of the draw.io diagram)](./architecture.drawio)
+[(Source of the draw.io diagram)](drawio_diagrams/architecture.drawio)
 
 # Local provisioning of the above Dynamic Web Architecture using Vagrant
 
@@ -57,7 +57,13 @@ Let's do a step by step walkthrought of the process deploying the static web app
 
 ## Jenkins
 
-[CI/CD using Jenkins](jenkins/README.md)
+### CI with Jenkins
+
+[CI using Jenkins](jenkins/README.md)
+
+### Docker CI with Jenkins
+
+[Docker CI using Jenkins](docker/README.md)
 
 To be continued ....
 

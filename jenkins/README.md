@@ -1,6 +1,6 @@
-# CI/CD using Jenkins
+# CI using Jenkins
 
-In this section, we will provide a detailed explanation of how we implement CI/CD automation for our web application on AWS using Jenkins.
+In this section, we will provide a detailed explanation of how we implement CI automation for our web application on AWS using Jenkins.
 
 ![jenkins_continuous_integration.drawio.png](images/jenkins_continuous_integration.drawio.png)
 
@@ -246,7 +246,7 @@ Enter Jenkins and install the required plugins:
 
 # Run your first Jenkins pipelines
 
-Write a pipeline script and run it; you can see one example in the provided [Jenkinsfile](../Jenkinsfile):
+Write a pipeline script and run it; you can see one example in the provided [../Jenkinsfile](../Jenkinsfile):
 
 You can copy the content and paste in a Jenkins pipeline as below:
 
@@ -283,7 +283,7 @@ The SonarQube url will change every time you re-start this EC2 instance, hence b
 
 # Run a SonarQube pipeline that checks the code style
 
-Copy the content in the [scripts/Jenkinsfile_checkstyle](scripts/Jenkinsfile_checkstyle) file and paste it in the below window:
+Copy the content in the [../jenkins_files/Jenkinsfile_checkstyle](../jenkins_files/Jenkinsfile_checkstyle) file and paste it in the below window:
 
 ![jenkins_checkstyle](images/jenkins_checkstyle.png)
 
@@ -296,7 +296,7 @@ This pipeline generates the checkstyle report, that will be interpreted by the S
 
 # Run a SonarQube pipeline that sends the checkstile analysis to SonarQube
 
-Copy the content in the [scripts/Jenkinsfile_sonarqube_analysis](scripts/Jenkinsfile_sonarqube_analysis) file and paste it in the below window:
+Copy the content in the [../jenkins_files/Jenkinsfile_sonarqube_analysis](../jenkins_files/Jenkinsfile_sonarqube_analysis) file and paste it in the below window:
 
 
 ![jenkins_checkstyle_sent_to_sonarqube](images/jenkins_checkstyle_sent_to_sonarqube.png)
@@ -323,7 +323,7 @@ Let's setup how much errors that we can tolerate.
 
 Now use the new SonarQube quality gate in your Jenkins pipeline pipeline, here is the updated file:
 
-[scripts/Jenkinsfile_sonarqube_analysis_quality_gate](scripts/Jenkinsfile_sonarqube_analysis_quality_gate)
+[../jenkins_files/Jenkinsfile_sonarqube_analysis_quality_gate](../jenkins_files/Jenkinsfile_sonarqube_analysis_quality_gate)
 
 Next, allow a webhook so that SonarQube can contact Jenkins after the analysis is complete:
 
@@ -335,4 +335,9 @@ As you can see, the quality gate blocked the pipeline:
 
 The reason is the number of failures limit was overpassed:
 
-![Jenkinsfile_sonarqube_analysis_quality_gate_03](Jenkinsfile_sonarqube_analysis_quality_gate_03.png)
+![Jenkinsfile_sonarqube_analysis_quality_gate_03](images/Jenkinsfile_sonarqube_analysis_quality_gate_03.png)
+
+# Add Nexus repository integration to your Jenkins pipelines
+
+
+(WIP)
