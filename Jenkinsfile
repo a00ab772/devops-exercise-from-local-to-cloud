@@ -1,21 +1,14 @@
 pipeline {
     agent any
-
     tools {
         maven "Maven 3.8.7"
         jdk "JDK-21"
     }
 
     stages {
-        stage('Fetch source code') {
+        stage('Fetch code') {
             steps {
                 git branch: 'main', url: 'https://github.com/a00ab772/devops-exercise-from-local-to-cloud.git'
-            }
-        }
-
-        stage('Unit test') {
-            steps {
-                sh 'mvn test'
             }
         }
 
@@ -23,13 +16,76 @@ pipeline {
             steps {
                 sh 'mvn install -DskipTests'
             }
-
             post {
                 success {
-                    echo 'Archiving artifact'
-                    archiveArtifacts artifacts: '**/*.war'
+                    echo 'Now Archiving it...'
+                    archiveArtifacts artifacts: '**/target/*.war'
                 }
             }
         }
+
+        stage('UNIT TEST') {
+            steps {
+                sh 'mvn test'
+            }
+        }
+
+        stage('Checkstyle Analysis') {
+            steps {
+                sh 'mvn checkstyle:checkstyle'
+            }
+        }
+
+        stage('Sonar Code analysis') {
+            environment {
+                scannerHome = tool 'sonar8.1.0'
+            }
+            steps {
+                withSonarQubeEnv('sonarserver') {
+                    sh '''${scannerHome}/bin/sonar-scanner \
+                        -Dsonar.projectKey=vprofile \
+                        -Dsonar.projectName=vprofile \
+                        -Dsonar.projectVersion=1.0 \
+                        -Dsonar.sources=src/ \
+                        -Dsonar.java.binaries=target/classes \
+                        -Dsonar.junit.reportsPath=target/surefire-reports \
+                        -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml \
+                        -Dsonar.java.checkstyle.reportPaths=target/checkstyle-result.xml \
+                        -Dsonar.exclusions="**/*.js,**/*.ts,**/*.css,**/*.html" \
+                        -Dsonar.javascript.skip=true'''
+                }
+            }
+        }
+
+       stage("Quality Gate") {
+            steps {
+                timeout(time: 2, unit: 'MINUTES') {
+                    // Parameter indicates whether to set pipeline to UNSTABLE if Quality Gate fails
+                    // true = set pipeline to UNSTABLE, false = don't
+                    waitForQualityGate abortPipeline: true
+                }
+            }
+        }
+
+        stage("Publish to Nexus") {
+          steps {
+            nexusArtifactUploader(
+              nexusVersion: 'nexus3',
+              protocol: 'http',
+              nexusUrl: 'ec2-44-192-168-233.compute-1.amazonaws.com:8081',
+              groupId: 'QA',
+              version: "${env.BUILD_ID}-${env.BUILD_NUMBER}",
+              repository: 'devops-exercise-from-local-to-cloud',
+              credentialsId: 'nexuscredentials',
+              artifacts: [
+                [  artifactId: 'devops-exercise-from-local-to-cloud',
+                   classifier: '',
+                   file: 'target/devops-exercise-from-local-to-cloud-v2.war',
+                   type: 'war'  ]
+              ]
+            )
+          }
+        }
+
     }
 }

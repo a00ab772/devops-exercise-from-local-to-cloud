@@ -21,7 +21,9 @@ You can use one of the below provided scripts, both provisions ubuntu host with 
 
 * [jenkins_cicd_setup_t4g.small.sh](scripts/jenkins_cicd_setup_t4g.small.sh) provisions a t4g.small EC2 instance, which is not free tier, but offers 2 GB RAM. It will cost you $0.0168 USD per hour in the us-east-1 region, but you will not suffer the sluggiest behaviour of the above configuration, but still the SonarQube will end up eating all the memory, and you will practically not be able to do much more than with the above.
 
-* [jenkins_cicd_setup_two_t4g.small.sh](scripts/jenkins_cicd_setup_two_t4g.small.sh) provisions two t4g.small EC2 instances, one will contain jenkins and nexus, and the other will contain sonarqube. They are not free tier, but each of them offers 2 GB RAM. It will cost you $0.0168 USD per hour per instance in the us-east-1 region, but you will not suffer the sluggiest behaviour of the above configuration, and mantaining separate the SonarQube will fix the the memory problems, allowing you to complete the lab.
+* [jenkins_cicd_setup_two_t4g.small.sh](scripts/jenkins_cicd_setup_two_t4g.small.sh) provisions two t4g.small EC2 instances, one will contain jenkins and nexus, and the other will contain sonarqube. They are not free tier, but each of them offers 2 GB RAM. It will cost you $0.0168 USD per hour per instance in the us-east-1 region, but you will not suffer the sluggiest behaviour of the above configuration, and mantaining separate the SonarQube will fix the memory problems, allowing you to complete the SonarQube analysis ... but still your pipeline will fail to upload the war to the Nexus server in the latest step.
+
+* [jenkins_cicd_setup_three_t4g.small.sh](scripts/jenkins_cicd_setup_three_t4g.small.sh) provisions three t4g.small EC2 instances, each cointaining one of the thee services. They are not free tier, but each of them offers 2 GB RAM. It will cost you $0.0168 USD per hour per instance in the us-east-1 region, but you will be definitively be able to complete the lab at zero cost.
 
 If you are not in the free tier you can save costs by using this:
 
@@ -321,11 +323,11 @@ Let's setup how much errors that we can tolerate.
 
 ![sonarqube_quality_gate_02](images/sonarqube_quality_gate_02.png)
 
-Now use the new SonarQube quality gate in your Jenkins pipeline pipeline, here is the updated file:
+Now use the new SonarQube quality gate in your Jenkins pipeline, here is the updated file:
 
 [../jenkins_files/Jenkinsfile_sonarqube_analysis_quality_gate](../jenkins_files/Jenkinsfile_sonarqube_analysis_quality_gate)
 
-Next, allow a webhook so that SonarQube can contact Jenkins after the analysis is complete:
+Next, allow a webhook so that SonarQube can contact Jenkins after the analysis is complete; remember that we are not using Api Gateway so be ready to update this value after you restart the lab as you did earlier for the connection from Jenkins to SonarQube:
 
 ![Jenkinsfile_sonarqube_analysis_quality_gate_01](images/Jenkinsfile_sonarqube_analysis_quality_gate_01.png)
 
@@ -339,5 +341,26 @@ The reason is the number of failures limit was overpassed:
 
 # Add Nexus repository integration to your Jenkins pipelines
 
+Add the last step in your Jenkins pipeline by integrating it with Nexus repository.
+
+First, you create a Maven 2 hosted repository in nexus where the pipeline will upload the generated war files:
+
+![jenkins_nexus](images/jenkins_nexus.png)
+
+Next, save the Nexus credentials in Jenkins:
+
+![jenkins_nexus_01](images/jenkins_nexus_01.png)
+
+![jenkins_nexus_02](images/jenkins_nexus_02.png)
+
+configure the Timestamp format that you want to use for the upload versions:
+
+![jenkins_nexus_03](images/jenkins_nexus_03.png)
+
+Nexus connectivity in Jenkins; as usual remember to update or else use Api Gateway instead of DNS:
+
+Next, add to the pipeline script the last step, you can find the complete version in[../jenkins_files/Jenkins_sonarqube_analysis_nexus_upload](../jenkins_files/Jenkins_sonarqube_analysis_nexus_upload)
+
+![jenkins_nexus_04](images/jenkins_nexus_04.png)
 
 (WIP)
