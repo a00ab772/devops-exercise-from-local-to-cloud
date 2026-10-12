@@ -72,7 +72,7 @@ pipeline {
             nexusArtifactUploader(
               nexusVersion: 'nexus3',
               protocol: 'http',
-              nexusUrl: 'http://ec2-44-192-168-233.compute-1.amazonaws.com:8081/',
+              nexusUrl: 'ec2-44-192-168-233.compute-1.amazonaws.com:8081/',
               groupId: 'QA',
               version: "${env.BUILD_ID}-${BUILD_TIMESTAMP}",
               repository: 'devops-exercise-from-local-to-cloud',
