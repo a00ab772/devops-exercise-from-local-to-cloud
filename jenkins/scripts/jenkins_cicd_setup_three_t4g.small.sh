@@ -88,6 +88,8 @@ setup_iam_profile() {
     fi
 
     aws iam attach-role-policy --role-name "$ROLE_NAME" --policy-arn arn:aws:iam::aws:policy/AmazonS3FullAccess >/dev/null || true
+    # Added policy to allow pushing images to ECR
+    aws iam attach-role-policy --role-name "$ROLE_NAME" --policy-arn arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryPowerUser >/dev/null || true
 
     if ! aws iam get-instance-profile --instance-profile-name "$PROFILE_NAME" >/dev/null 2>&1; then
         aws iam create-instance-profile --instance-profile-name "$PROFILE_NAME" >/dev/null
@@ -140,7 +142,11 @@ echo '/swapfile none swap sw 0 0' >> /etc/fstab
 
 log "Updating system packages and installing prerequisites..."
 apt-get update -y && apt-get upgrade -y
-apt-get install -y fontconfig openjdk-21-jdk unzip curl net-tools groff maven tree
+apt-get install -y fontconfig openjdk-21-jdk unzip curl net-tools groff maven tree docker.io
+
+# Enable Docker and grant permissions to the jenkins user
+systemctl enable --now docker
+usermod -aG docker jenkins
 
 log "Installing Jenkins prerequisites and stable Node.js..."
 mkdir -p /etc/apt/keyrings
@@ -411,6 +417,7 @@ teardown() {
     if aws iam get-role --role-name "$ROLE_NAME" >/dev/null 2>&1; then
         aws iam detach-role-policy --role-name "$ROLE_NAME" --policy-arn arn:aws:iam::aws:policy/AmazonEC2FullAccess >/dev/null || true
         aws iam detach-role-policy --role-name "$ROLE_NAME" --policy-arn arn:aws:iam::aws:policy/AmazonS3FullAccess >/dev/null || true
+        aws iam detach-role-policy --role-name "$ROLE_NAME" --policy-arn arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryPowerUser >/dev/null || true
         aws iam delete-role --role-name "$ROLE_NAME" >/dev/null || true
     fi
 

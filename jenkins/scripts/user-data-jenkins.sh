@@ -13,7 +13,11 @@ echo '/swapfile none swap sw 0 0' >> /etc/fstab
 
 log "Updating system packages and installing prerequisites..."
 apt-get update -y && apt-get upgrade -y
-apt-get install -y fontconfig openjdk-21-jdk unzip curl net-tools groff maven tree
+apt-get install -y fontconfig openjdk-21-jdk unzip curl net-tools groff maven tree docker.io
+
+# Enable Docker and grant permissions to the jenkins user
+systemctl enable --now docker
+usermod -aG docker jenkins
 
 log "Installing Jenkins prerequisites and stable Node.js..."
 mkdir -p /etc/apt/keyrings

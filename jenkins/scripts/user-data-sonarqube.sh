@@ -23,7 +23,7 @@ rm -rf /tmp/awscliv2.zip /tmp/aws
 
 log "Downloading SonarQube from S3 bucket..."
 useradd -r -M -d /opt/sonarqube -s /bin/bash sonarqube || true
-aws s3 cp s3://jenkins-sonarqube-binaries-22254/sonarqube.zip /tmp/sonarqube.zip --region us-east-1
+aws s3 cp s3://jenkins-sonarqube-binaries-16422/sonarqube.zip /tmp/sonarqube.zip --region us-east-1
 unzip -q /tmp/sonarqube.zip -d /tmp
 rm -rf /opt/sonarqube
 mv /tmp/sonarqube-* /opt/sonarqube
