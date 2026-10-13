@@ -86,14 +86,29 @@ pipeline {
                         string(credentialsId: 'registry-app-image', variable: 'appRegistry'),
                         aws(credentialsId: 'awscreds', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')
                     ]) {
-                        docker.withRegistry("https://${registryUrl}", 'awscreds') {
-                            def customImage = docker.image("${appRegistry}:${env.BUILD_NUMBER}")
-                            customImage.push("${env.BUILD_NUMBER}")
-                            customImage.push('latest')
-                        }
+                        sh "aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin https://${registryUrl}"
+                        def customImage = docker.image("${appRegistry}:${env.BUILD_NUMBER}")
+                        customImage.push("${env.BUILD_NUMBER}")
+                        customImage.push('latest')
                     }
                 }
             }
         }
+
+        stage('Cleanup Images') {
+            steps {
+                script {
+                    withCredentials([
+                        string(credentialsId: 'registry-app-image', variable: 'appRegistry')
+                    ]) {
+                        sh """
+                            docker rmi ${appRegistry}:${env.BUILD_NUMBER} || true
+                            docker rmi ${appRegistry}:latest || true
+                        """
+                    }
+                }
+            }
+        }
+
     }
 }
