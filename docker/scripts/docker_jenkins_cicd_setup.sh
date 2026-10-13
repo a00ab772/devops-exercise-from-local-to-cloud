@@ -171,7 +171,6 @@ apt-get update -y && apt-get upgrade -y
 apt-get install -y fontconfig openjdk-21-jdk unzip curl net-tools groff maven tree docker.io
 
 systemctl enable --now docker
-usermod -aG docker jenkins
 
 log "Installing Jenkins prerequisites and stable Node.js..."
 mkdir -p /etc/apt/keyrings
@@ -183,6 +182,10 @@ apt-get install -y nodejs
 
 apt-get update -y && apt-get install -y jenkins
 systemctl enable --now jenkins
+
+# Grant docker permissions to jenkins user after the user is created by package installation
+usermod -aG docker jenkins
+systemctl restart docker
 
 log "Setting up daily shutdown cron job..."
 INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
@@ -359,13 +362,11 @@ teardown() {
     fi
 
     if aws iam get-role --role-name "$ROLE_NAME" >/dev/null 2>&1; then
-        # Detach all managed policies
         ATTACHED_POLICIES=$(aws iam list-attached-role-policies --role-name "$ROLE_NAME" --query 'AttachedPolicies[*].PolicyArn' --output text 2>/dev/null || true)
         for policy_arn in $ATTACHED_POLICIES; do
             aws iam detach-role-policy --role-name "$ROLE_NAME" --policy-arn "$policy_arn" >/dev/null || true
         done
 
-        # Delete any inline policies to prevent DeleteConflict errors
         INLINE_POLICIES=$(aws iam list-role-policies --role-name "$ROLE_NAME" --query 'PolicyNames[*]' --output text 2>/dev/null || true)
         for policy_name in $INLINE_POLICIES; do
             aws iam delete-role-policy --role-name "$ROLE_NAME" --policy-name "$policy_name" >/dev/null || true
