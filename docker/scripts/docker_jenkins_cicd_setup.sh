@@ -11,6 +11,10 @@ readonly PROFILE_NAME="EC2ShutdownProfile"
 readonly TAG_NAME_JENKINS="Jenkins-Server"
 readonly TAG_NAME_SONARQUBE="SonarQube-Server"
 readonly S3_BUCKET_NAME="jenkins-sonarqube-binaries-${RANDOM}"
+readonly ECS_CLUSTER_NAME="devops-exercise-from-local-to-cloud"
+readonly ECS_SERVICE_NAME="devops-exercise-from-local-to-cloud-service"
+readonly ECS_TASK_FAMILY="devops-exercise-from-local-to-cloud-task"
+readonly ECR_REPO_NAME="myapprepo"
 
 log() {
     echo "[$(date +'%Y-%m-%d %H:%M:%S')] $1" >&2
@@ -20,8 +24,8 @@ usage() {
     echo "Usage: $0 {provision|teardown|update-ip}"
     echo
     echo "Options:"
-    echo "  provision  : Deploys IAM roles, S3 bucket, Security Group, EC2 instances, and Jenkins IAM user."
-    echo "  teardown   : Terminates EC2 instances and cleans up AWS resources including IAM user."
+    echo "  provision  : Deploys IAM roles, S3 bucket, Security Group, EC2 instances, IAM user, ECR, and ECS resources."
+    echo "  teardown   : Terminates EC2 instances, cleans up AWS resources including IAM user, ECR, and ECS resources."
     echo "  update-ip  : Fetches your local machine's current public IP via curl,"
     echo "               clears out stale ingress rules in the Security Group, and"
     echo "               authorizes the new IP (ports 22, 8080, 9000) plus"
@@ -124,6 +128,48 @@ print('Access Key ID:     ', key['AccessKeyId'])
 print('Secret Access Key: ', key['SecretAccessKey'])
 print('----------------------------------------')
 "
+}
+
+setup_ecr_repository() {
+    log "Checking/Creating ECR Repository: $ECR_REPO_NAME..."
+    aws ecr describe-repositories --repository-names "$ECR_REPO_NAME" --region "$AWS_REGION" >/dev/null 2>&1 || \
+    aws ecr create-repository --repository-name "$ECR_REPO_NAME" --region "$AWS_REGION" >/dev/null
+}
+
+setup_ecs_resources() {
+    log "Creating ECS Cluster: $ECS_CLUSTER_NAME..."
+    aws ecs create-cluster --cluster-name "$ECS_CLUSTER_NAME" --region "$AWS_REGION" >/dev/null || true
+
+    log "Registering initial placeholder Task Definition: $ECS_TASK_FAMILY..."
+    aws ecs register-task-definition \
+        --family "$ECS_TASK_FAMILY" \
+        --network-mode awsvpc \
+        --requires-compatibilities FARGATE \
+        --cpu "256" \
+        --memory "512" \
+        --container-definitions "[{
+            \"name\": \"app\",
+            \"image\": \"amazon/amazon-ecs-sample\",
+            \"portMappings\": [{
+                \"containerPort\": 8080,
+                \"hostPort\": 8080
+            }]
+        }]" \
+        --region "$AWS_REGION" >/dev/null || true
+
+    log "Creating ECS Service: $ECS_SERVICE_NAME..."
+    DEFAULT_SUBNET=$(aws ec2 describe-subnets --filters "Name=default-for-az,Values=true" --query "Subnets[0].SubnetId" --output text --region "$AWS_REGION" 2>/dev/null || true)
+
+    if [ -n "$DEFAULT_SUBNET" ] && [ "$DEFAULT_SUBNET" != "None" ]; then
+        aws ecs create-service \
+            --cluster "$ECS_CLUSTER_NAME" \
+            --service-name "$ECS_SERVICE_NAME" \
+            --task-definition "$ECS_TASK_FAMILY" \
+            --desired-count 1 \
+            --launch-type FARGATE \
+            --network-configuration "awsvpcConfiguration={subnets=[$DEFAULT_SUBNET],securityGroups=[$SG_ID],assignPublicIp=ENABLED}" \
+            --region "$AWS_REGION" >/dev/null || true
+    fi
 }
 
 upload_binary_to_s3() {
@@ -285,6 +331,8 @@ provision() {
     SG_ID=$(create_security_group)
     setup_iam_profile
     create_jenkins_iam_user
+    setup_ecr_repository
+    setup_ecs_resources
     upload_binary_to_s3
 
     generate_user_data_jenkins
@@ -320,7 +368,7 @@ provision() {
         --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=$TAG_NAME_SONARQUBE}]" \
         --query 'Instances[0].InstanceId' --output text --region "$AWS_REGION")
 
-    log "Successfully provisioned all instances!"
+    log "Successfully provisioned all instances, ECR, and ECS resources!"
     log "Jenkins Instance ID: $ID_JENKINS"
     log "SonarQube Instance ID: $ID_SQ"
 }
@@ -341,6 +389,23 @@ teardown() {
     log "Waiting for instances to terminate..."
     sleep 15
 
+    log "Cleaning up ECS Service and Cluster..."
+    aws ecs update-service --cluster "$ECS_CLUSTER_NAME" --service "$ECS_SERVICE_NAME" --desired-count 0 --region "$AWS_REGION" >/dev/null 2>&1 || true
+    aws ecs delete-service --cluster "$ECS_CLUSTER_NAME" --service "$ECS_SERVICE_NAME" --force --region "$AWS_REGION" >/dev/null 2>&1 || true
+    aws ecs delete-cluster --cluster "$ECS_CLUSTER_NAME" --region "$AWS_REGION" >/dev/null 2>&1 || true
+
+    log "Deregistering ECS Task Definitions..."
+    TASK_ARNS=$(aws ecs list-task-definitions --family-prefix "$ECS_TASK_FAMILY" --status ACTIVE --query "taskDefinitionArns" --output text --region "$AWS_REGION" 2>/dev/null || true)
+    for task_arn in $TASK_ARNS; do
+        if [ -n "$task_arn" ] && [ "$task_arn" != "None" ]; then
+            log "Deregistering task definition: $task_arn"
+            aws ecs deregister-task-definition --task-definition "$task_arn" --region "$AWS_REGION" >/dev/null 2>&1 || true
+        fi
+    done
+
+    log "Cleaning up ECR Repository ($ECR_REPO_NAME)..."
+    aws ecr delete-repository --repository-name "$ECR_REPO_NAME" --force --region "$AWS_REGION" >/dev/null 2>&1 || true
+
     EXISTING_BUCKET=$(aws s3api list-buckets --query "Buckets[?starts_with(Name, 'jenkins-sonarqube-binaries-')].Name" --output text 2>/dev/null || true)
     if [ -n "$EXISTING_BUCKET" ] && [ "$EXISTING_BUCKET" != "None" ]; then
         read -p "Do you want to delete '$EXISTING_BUCKET' and its content? (y/N): " -n 1 -r
@@ -357,8 +422,14 @@ teardown() {
     log "Deleting Security Group..."
     SG_ID=$(aws ec2 describe-security-groups --group-names "$SECURITY_GROUP_NAME" --region "$AWS_REGION" --query 'SecurityGroups[0].GroupId' --output text 2>/dev/null || true)
     if [ -n "$SG_ID" ] && [ "$SG_ID" != "None" ]; then
-        sleep 5
-        aws ec2 delete-security-group --group-id "$SG_ID" --region "$AWS_REGION" >/dev/null || log "Warning: Could not delete security group immediately."
+        log "Waiting for dependent ENIs to release..."
+        for i in {1..12}; do
+            if aws ec2 delete-security-group --group-id "$SG_ID" --region "$AWS_REGION" >/dev/null 2>&1; then
+                log "Security Group successfully deleted."
+                break
+            fi
+            sleep 5
+        done
     fi
 
     log "Cleaning up IAM Profile and Role..."

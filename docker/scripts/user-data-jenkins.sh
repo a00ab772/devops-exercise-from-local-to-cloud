@@ -15,8 +15,13 @@ log "Updating system packages and installing prerequisites..."
 apt-get update -y && apt-get upgrade -y
 apt-get install -y fontconfig openjdk-21-jdk unzip curl net-tools groff maven tree docker.io
 
+log "Installing official AWS CLI v2 for ARM64..."
+curl -s "https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip" -o "/tmp/awscliv2.zip"
+unzip -q /tmp/awscliv2.zip -d /tmp
+/tmp/aws/install
+rm -rf /tmp/awscliv2.zip /tmp/aws
+
 systemctl enable --now docker
-usermod -aG docker jenkins
 
 log "Installing Jenkins prerequisites and stable Node.js..."
 mkdir -p /etc/apt/keyrings
@@ -28,6 +33,10 @@ apt-get install -y nodejs
 
 apt-get update -y && apt-get install -y jenkins
 systemctl enable --now jenkins
+
+# Grant docker permissions to jenkins user after the user is created by package installation
+usermod -aG docker jenkins
+systemctl restart docker
 
 log "Setting up daily shutdown cron job..."
 INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)

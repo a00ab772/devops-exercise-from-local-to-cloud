@@ -5,6 +5,11 @@ pipeline {
         jdk "JDK-21"
     }
 
+    environment {
+        cluster = "devops-exercise-from-local-to-cloud"
+        service = "devops-exercise-from-local-to-cloud-service"
+    }
+
     stages {
         stage('Fetch code') {
             steps {
@@ -105,6 +110,18 @@ pipeline {
                             docker rmi ${appRegistry}:${env.BUILD_NUMBER} || true
                             docker rmi ${appRegistry}:latest || true
                         """
+                    }
+                }
+            }
+        }
+
+        stage('Deploy to ecs') {
+            steps {
+                script {
+                    withCredentials([
+                        aws(credentialsId: 'awscreds', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')
+                    ]) {
+                        sh 'aws ecs update-service --cluster ${cluster} --service ${service} --force-new-deployment --region us-east-1'
                     }
                 }
             }
