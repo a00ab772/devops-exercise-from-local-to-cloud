@@ -68,7 +68,7 @@ Let's do a step by step walkthrought of the process deploying the static web app
 
 ## GitHub actions
 
-[CI/CD with GitHub actions]()
+[CI/CD with GitHub actions](github_actions/README.md)
 
 To be continued ....
 
