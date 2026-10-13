@@ -51,7 +51,7 @@ Let's do a step by step walkthrought of the process deploying the static web app
 
 * [AWS Re-factor (re-architect) provisioning](aws/re-factor_provisioning/README.md)
 
-# Continuous Integration
+# Continuous Integration and Continuous Delivery
 
 (CI/CD: Jenkins, GitHub Actions, GitLab CI/CD, CircleCI, Travis CI)
 
@@ -63,12 +63,17 @@ Let's do a step by step walkthrought of the process deploying the static web app
 
 ### Docker CI with Jenkins
 
-[Docker CI using Jenkins](docker/README.md)
+[Docker CI/CD using Jenkins](docker/README.md)
+
 
 To be continued ....
 
 (IAAC: Ansible, Terraform, CloudFormation)
 (PAAS and SAAS: RDS, VPC, IAM, Security Groups, Route53, CloudFront, ELB, S3, EKS, ECR, ECS)
+
+
+## GitHub actions
+
 
 # Kubernetes cloud provisioning
 

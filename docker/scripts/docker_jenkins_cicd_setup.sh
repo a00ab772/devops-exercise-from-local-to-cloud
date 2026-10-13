@@ -236,8 +236,9 @@ apt-get update -y && apt-get install -y jenkins
 systemctl enable --now jenkins
 
 # Grant docker permissions to jenkins user after the user is created by package installation
-usermod -aG docker jenkins
-systemctl restart docker
+sudo usermod -aG docker jenkins
+sudo systemctl restart docker
+sudo systemctl restart jenkins
 
 log "Setting up daily shutdown cron job..."
 INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)

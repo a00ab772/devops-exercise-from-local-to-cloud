@@ -7,7 +7,7 @@ In this section, we will provide a detailed explanation of how we implement Dock
 
 # Docker CI/CD environment setup
 
-The steps are pretty much the same as you did in [../jenkins/README.md](../jenkins/README.md), except that you don't need the Nexus server up and running so we will be spinning the Jenkins CI/CD infrastructure using the [](scripts/docker_jenkins_cicd_setup.sh)script:
+The steps are pretty much the same as you did in [../jenkins/README.md](../jenkins/README.md), except that you don't need the Nexus server up and running so we will be spinning the Jenkins CI/CD infrastructure using the [scripts/docker_jenkins_cicd_setup.sh](scripts/docker_jenkins_cicd_setup.sh)script:
 
 ```bash
 user@DESKTOP-SCNMK3I UCRT64 ~/Documents/devops-exercise-from-local-to-cloud/docker/scripts (main)
@@ -46,6 +46,12 @@ Secret Access Key:  Xs*************************************bdE
 
 Connect to the Jenkins url and install these plugins:
 
+* Amazon Web Services SDK :: All
+* AWS Credentials Plugin
+* Build Timestamp Plugin
+* CloudBees Docker Build and Publish plugin
+* SonarQube Scanner for Jenkins
+
 ![docker_jenkins_01](images/docker_jenkins_01.png)
 
 Continue with the configuration that you saw in [../jenkins/README.md](../jenkins/README.md), here shrunk in a small set of screenshots, go there for an extended explanation if required:
@@ -73,3 +79,7 @@ Next, create a new Jenkins pipeline using the provided  [../jenkins_files/Jenkin
 Then run the Jenkins pipeline and verify that the docker image has been pushed to the AWS ECR:
 
 ![ecr_repo_setup_04](images/ecr_repo_setup_04.png)
+
+Access the ECS container service, you will need to add access to your IP to the port 80:
+
+![ecr_repo_setup_05](images/ecr_repo_setup_05.png)
