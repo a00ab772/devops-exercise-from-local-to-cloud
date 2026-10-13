@@ -5,15 +5,6 @@ pipeline {
         jdk "JDK-21"
     }
 
-    environment {
-        // awsCredentials = 'ecr:us-east-1:awscreds'
-        awsCredentials = credentials('awscreds')
-        //  registryUrl = "https://716657**********4.dkr.ecr.us-east-1.amazonaws.com"
-        registryUrl = credentials('registry-url')
-        // appRegistry = "716657**********4.dkr.ecr.us-east-1.amazonaws.com/myapprepo"
-        appRegistry = credentials('registry-app-image')
-    }
-
     stages {
         stage('Fetch code') {
             steps {
@@ -69,33 +60,40 @@ pipeline {
        stage("Quality Gate") {
             steps {
                 timeout(time: 2, unit: 'MINUTES') {
-                    // Parameter indicates whether to set pipeline to UNSTABLE if Quality Gate fails
-                    // true = set pipeline to UNSTABLE, false = don't
                     waitForQualityGate abortPipeline: true
                 }
             }
         }
 
         stage('Build App Image') {
-          steps {
-
-            script {
-                dockerImage = docker.build( appRegistry + ":$BUILD_NUMBER", "./docker/dockerfiles/app/multistage/")
+            steps {
+                script {
+                    withCredentials([
+                        string(credentialsId: 'registry-app-image', variable: 'appRegistry')
+                    ]) {
+                        def imgTag = "${appRegistry}:${env.BUILD_NUMBER}"
+                        docker.build(imgTag, "./docker/dockerfiles/app/multistage/")
+                    }
                 }
-          }
-
+            }
         }
 
         stage('Upload App Image') {
-          steps{
-            script {
-              docker.withRegistry( registryUrl, awsCredentials ) {
-                dockerImage.push("$BUILD_NUMBER")
-                dockerImage.push('latest')
-              }
+            steps {
+                script {
+                    withCredentials([
+                        string(credentialsId: 'registry-url', variable: 'registryUrl'),
+                        string(credentialsId: 'registry-app-image', variable: 'appRegistry'),
+                        aws(credentialsId: 'awscreds', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')
+                    ]) {
+                        docker.withRegistry("https://${registryUrl}", 'awscreds') {
+                            def customImage = docker.image("${appRegistry}:${env.BUILD_NUMBER}")
+                            customImage.push("${env.BUILD_NUMBER}")
+                            customImage.push('latest')
+                        }
+                    }
+                }
             }
-          }
         }
-
     }
 }

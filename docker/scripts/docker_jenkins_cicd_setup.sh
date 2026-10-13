@@ -170,6 +170,12 @@ log "Updating system packages and installing prerequisites..."
 apt-get update -y && apt-get upgrade -y
 apt-get install -y fontconfig openjdk-21-jdk unzip curl net-tools groff maven tree docker.io
 
+log "Installing official AWS CLI v2 for ARM64..."
+curl -s "https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip" -o "/tmp/awscliv2.zip"
+unzip -q /tmp/awscliv2.zip -d /tmp
+/tmp/aws/install
+rm -rf /tmp/awscliv2.zip /tmp/aws
+
 systemctl enable --now docker
 
 log "Installing Jenkins prerequisites and stable Node.js..."

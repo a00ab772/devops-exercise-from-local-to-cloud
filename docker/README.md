@@ -65,3 +65,7 @@ Jenkins file will refer these three secrets that you need to store based in the 
 Next, create a new Jenkins pipeline using the provided  [../jenkins_files/Jenkinsfile_ecr](../jenkins_files/Jenkinsfile_ecr) file:
 
 ![ecr_repo_setup_03](images/ecr_repo_setup_03.png)
+
+Then run the Jenkins pipeline and verify that the docker image has been pushed to the AWS ECR:
+
+![ecr_repo_setup_04](images/ecr_repo_setup_04.png)
