@@ -5,11 +5,7 @@ on:
   pull_request:
     branches: [ "main" ]
     types: [ closed ]
-
-  workflow_dispatch: # Allows GitHub action to be manually triggered.
-
-#  schedule:
-#    - cron: '0 0 * * *'
+  workflow_dispatch: # Allows manual execution
 
 env:
   AWS_REGION: us-east-1
@@ -25,7 +21,7 @@ permissions:
 jobs:
   deploy:
     name: Deploy
-    if: github.event.pull_request.merged == true
+    if: (github.event_name == 'pull_request' && github.event.pull_request.merged == true) || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     environment: production
 
@@ -39,16 +35,10 @@ jobs:
           distribution: 'temurin'
           java-version: '21'
 
-      - name: Run Maven Test in main branch
-        if: github.ref == 'refs/heads/main'
-        run: mvn test
-
-      - name: Don't run Maven Test in other branch
-        if: github.ref == 'refs/heads/main'
+      - name: Run Maven Tests
         run: mvn test
 
       - name: Run Checkstyle / Maven Verify
-        if: github.ref == 'refs/heads/main'
         run: mvn checkstyle:check verify
 
       - name: SonarQube Scan
@@ -80,9 +70,6 @@ jobs:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          # Build a docker container and
-          # push it to ECR so that it can
-          # be deployed to ECS.
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -f docker/dockerfiles/app/multistage/Dockerfile .
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
           echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
@@ -102,3 +89,8 @@ jobs:
           service: ${{ env.ECS_SERVICE }}
           cluster: ${{ env.ECS_CLUSTER }}
           wait-for-service-stability: true
+
+      - name: Notify on Failure
+        if: failure()
+        run: |
+          echo "❌ Pipeline failed during verification or deployment steps!"
