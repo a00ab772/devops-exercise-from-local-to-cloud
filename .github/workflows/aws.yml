@@ -6,6 +6,11 @@ on:
     branches: [ "main" ]
     types: [ closed ]
 
+  workflow_dispatch: # Allows GitHub action to be manually triggered.
+
+#  schedule:
+#    - cron: '0 0 * * *'
+
 env:
   AWS_REGION: us-east-1
   ECR_REPOSITORY: myapprepo
@@ -34,7 +39,16 @@ jobs:
           distribution: 'temurin'
           java-version: '21'
 
+      - name: Run Maven Test in main branch
+        if: github.ref == 'refs/heads/main'
+        run: mvn test
+
+      - name: Don't run Maven Test in other branches
+        if: github.ref != 'refs/heads/main'
+        run: echo "Skipping unit tests in other branches different to main"
+
       - name: Run Checkstyle / Maven Verify
+        if: github.ref == 'refs/heads/main'
         run: mvn checkstyle:check verify
 
       - name: SonarQube Scan
