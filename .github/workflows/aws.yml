@@ -31,7 +31,7 @@ on:
     branches: [ "main" ]
 
 env:
-  AWS_REGION: us-west-1
+  AWS_REGION: us-east-1
   ECR_REPOSITORY: myapprepo
   ECS_SERVICE: devops-exercise-from-local-to-cloud-service
   ECS_CLUSTER: devops-exercise-from-local-to-cloud

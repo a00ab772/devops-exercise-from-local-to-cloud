@@ -34,7 +34,7 @@ $ ./setup_ghactions_aws.sh provision
 
 The IAM user has been created and provided with proper permissions to interact with ECS:
 
-![docker_cicd_github_actions](docker_cicd_github_actions.png)
+![docker_cicd_github_actions](images/docker_cicd_github_actions.png)
 
 The Github repository secrets has been generated and stored in your Github repo configuration:
 
@@ -52,5 +52,6 @@ We actually will not create it as it is, instead we will use the [../.github/wor
 
 Additionally we create the [../task-definition.json](../task-definition.json) to be used by the GitHub action.
 
-Let's push the code:
+After we push the code changes the GitHub acction is triggered and the deployment to ECS happens exactly the same as we saw with Jenkins:
 
+![docker_cicd_github_actions_04](images/docker_cicd_github_actions_04.png)
