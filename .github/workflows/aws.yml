@@ -94,4 +94,4 @@ jobs:
         if: failure()
         run: |
           echo "ERROR - Pipeline failed during verification or deployment steps!"
-          echo "Please run the provided 'github_actions/scripts/setup_ghactions_aws.sh' script in case you forgot to do it."
+          echo "Please run the provided github_actions/scripts/setup_ghactions_aws.sh script in case you forgot to do it."
