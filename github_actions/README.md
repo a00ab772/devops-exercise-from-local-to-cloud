@@ -56,7 +56,7 @@ After we push the code changes the GitHub acction is triggered and the deploymen
 
 ![docker_cicd_github_actions_04](images/docker_cicd_github_actions_04.png)
 
-As usual, teardown the lab and make sure that no ECS, ECR, or any unwanted component remains in your AWS account:
+As usual, teardown the lab and make sure that no github secrets, AWS ECS, ECR, or any unwanted component remains in your AWS account:
 
 ```bash
 user@DESKTOP-SCNMK3I UCRT64 ~/Documents/devops-exercise-from-local-to-cloud/github_actions/scripts (main)
@@ -68,5 +68,11 @@ $ ./setup_ghactions_aws.sh teardown
 [2026-10-14 08:17:16] Deregistering task definition: arn:aws:ecs:us-east-1:43*********5:task-definition/devops-exercise-from-local-to-cloud-task:6
 [2026-10-14 08:17:18] 3. Cleaning up ECR Repository (myapprepo)...
 [2026-10-14 08:17:19] 4. Cleaning up IAM User (github-actions-deployer)...
-[2026-10-14 08:17:31] Teardown complete!
+[2026-10-14 08:29:02] 5. Removing GitHub Secrets...
+✓ Deleted Actions secret AWS_ACCESS_KEY_ID from a00ab772/devops-exercise-from-local-to-cloud
+✓ Deleted Actions secret AWS_SECRET_ACCESS_KEY from a00ab772/devops-exercise-from-local-to-cloud
+✓ Deleted Actions secret AWS_ACCOUNT_ID from a00ab772/devops-exercise-from-local-to-cloud
+[2026-10-14 08:29:06] GitHub Secrets successfully removed!
+[2026-10-14 08:29:06] Teardown complete!
+
 ```

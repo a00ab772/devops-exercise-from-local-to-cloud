@@ -17,7 +17,7 @@ usage() {
     echo
     echo "Options:"
     echo "  provision : Creates ECR, ECS cluster, service, task definition, and IAM user, and pushes keys & account ID to GitHub Secrets."
-    echo "  teardown  : Cleans up and deletes all created AWS resources (ECS, ECR, and IAM user)."
+    echo "  teardown  : Cleans up AWS resources (ECS, ECR, IAM user) and deletes GitHub repository secrets."
     exit 1
 }
 
@@ -96,18 +96,15 @@ provision() {
     AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query "Account" --output text)
 
     log "8. Generating Access Keys and updating GitHub Secrets automatically..."
-    # Clean up any existing keys for this user to avoid hitting limits
     KEYS=$(aws iam list-access-keys --user-name "$IAM_USER_NAME" --query 'AccessKeyMetadata[*].AccessKeyId' --output text 2>/dev/null || true)
     for kid in $KEYS; do
         aws iam delete-access-key --user-name "$IAM_USER_NAME" --access-key-id "$kid" >/dev/null 2>&1 || true
     done
 
-    # Create new access key
     CREDENTIALS=$(aws iam create-access-key --user-name "$IAM_USER_NAME" --output json)
     ACCESS_KEY_ID=$(echo "$CREDENTIALS" | python3 -c "import sys, json; print(json.load(sys.stdin)['AccessKey']['AccessKeyId'])")
     SECRET_ACCESS_KEY=$(echo "$CREDENTIALS" | python3 -c "import sys, json; print(json.load(sys.stdin)['AccessKey']['SecretAccessKey'])")
 
-    # Set secrets using GitHub CLI (gh) client-side encryption
     echo "$ACCESS_KEY_ID" | gh secret set AWS_ACCESS_KEY_ID
     echo "$SECRET_ACCESS_KEY" | gh secret set AWS_SECRET_ACCESS_KEY
     echo "$AWS_ACCOUNT_ID" | gh secret set AWS_ACCOUNT_ID
@@ -152,6 +149,16 @@ teardown() {
 
         aws iam delete-user-policy --user-name "$IAM_USER_NAME" --policy-name "PassRolePolicy" >/dev/null 2>&1 || true
         aws iam delete-user --user-name "$IAM_USER_NAME" >/dev/null || true
+    fi
+
+    log "5. Removing GitHub Secrets..."
+    if command -v gh &> /dev/null && gh auth status &> /dev/null; then
+        gh secret delete AWS_ACCESS_KEY_ID || true
+        gh secret delete AWS_SECRET_ACCESS_KEY || true
+        gh secret delete AWS_ACCOUNT_ID || true
+        log "GitHub Secrets successfully removed!"
+    else
+        log "GitHub CLI not found or unauthenticated; skipping secret cleanup in GitHub."
     fi
 
     log "Teardown complete!"
