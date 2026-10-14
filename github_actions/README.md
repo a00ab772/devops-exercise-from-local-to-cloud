@@ -1,5 +1,7 @@
 # Docker CI/CD GitHub actions workflow
 
+Before you proceed please note that the SonarQube instance up and running before you continue with this section, otherwise the Github action will fail in the code analysis step. To do this please visit [../docker/README.md](../docker/README.md).
+
 Use the provided [scripts/setup_ghactions_aws.sh](scripts/setup_ghactions_aws.sh) to create ECR, ECS cluster, service, task definition, and IAM user that will be used in this GitHub Action:
 
 ```bash

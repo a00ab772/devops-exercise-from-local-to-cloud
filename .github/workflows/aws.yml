@@ -2,8 +2,9 @@
 name: Deploy to Amazon ECS
 
 on:
-  push:
+  pull_request:
     branches: [ "main" ]
+    types: [ closed ]
 
 env:
   AWS_REGION: us-east-1
@@ -19,6 +20,7 @@ permissions:
 jobs:
   deploy:
     name: Deploy
+    if: github.event.pull_request.merged == true
     runs-on: ubuntu-latest
     environment: production
 
