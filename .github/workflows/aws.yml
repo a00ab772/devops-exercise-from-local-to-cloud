@@ -5,7 +5,7 @@ on:
   pull_request:
     branches: [ "main" ]
     types: [ closed ]
-  workflow_dispatch: # Allows manual execution
+  workflow_dispatch: # Permite ejecución manual
 
 env:
   AWS_REGION: us-east-1
@@ -93,4 +93,4 @@ jobs:
       - name: Notify on Failure
         if: failure()
         run: |
-          echo "❌ Pipeline failed during verification or deployment steps!"
+          echo "ERROR - Pipeline failed during verification or deployment steps!"
