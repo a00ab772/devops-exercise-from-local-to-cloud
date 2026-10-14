@@ -55,3 +55,18 @@ Additionally we create the [../task-definition.json](../task-definition.json) to
 After we push the code changes the GitHub acction is triggered and the deployment to ECS happens exactly the same as we saw with Jenkins:
 
 ![docker_cicd_github_actions_04](images/docker_cicd_github_actions_04.png)
+
+As usual, teardown the lab and make sure that no ECS, ECR, or any unwanted component remains in your AWS account:
+
+```bash
+user@DESKTOP-SCNMK3I UCRT64 ~/Documents/devops-exercise-from-local-to-cloud/github_actions/scripts (main)
+Wed Oct 14 08:16:12
+$ ./setup_ghactions_aws.sh teardown
+[2026-10-14 08:17:07] 1. Cleaning up ECS Service and Cluster...
+[2026-10-14 08:17:13] 2. Deregistering ECS Task Definitions...
+[2026-10-14 08:17:14] Deregistering task definition: arn:aws:ecs:us-east-1:43*********5:task-definition/devops-exercise-from-local-to-cloud-task:5
+[2026-10-14 08:17:16] Deregistering task definition: arn:aws:ecs:us-east-1:43*********5:task-definition/devops-exercise-from-local-to-cloud-task:6
+[2026-10-14 08:17:18] 3. Cleaning up ECR Repository (myapprepo)...
+[2026-10-14 08:17:19] 4. Cleaning up IAM User (github-actions-deployer)...
+[2026-10-14 08:17:31] Teardown complete!
+```

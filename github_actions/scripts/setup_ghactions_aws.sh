@@ -120,6 +120,10 @@ teardown() {
     log "1. Cleaning up ECS Service and Cluster..."
     aws ecs update-service --cluster "$ECS_CLUSTER_NAME" --service "$ECS_SERVICE_NAME" --desired-count 0 --region "$AWS_REGION" >/dev/null 2>&1 || true
     aws ecs delete-service --cluster "$ECS_CLUSTER_NAME" --service "$ECS_SERVICE_NAME" --force --region "$AWS_REGION" >/dev/null 2>&1 || true
+
+    log "Waiting for ECS service to be fully deleted..."
+    aws ecs wait services-inactive --cluster "$ECS_CLUSTER_NAME" --services "$ECS_SERVICE_NAME" --region "$AWS_REGION" 2>/dev/null || true
+
     aws ecs delete-cluster --cluster "$ECS_CLUSTER_NAME" --region "$AWS_REGION" >/dev/null 2>&1 || true
 
     log "2. Deregistering ECS Task Definitions..."
@@ -163,4 +167,4 @@ case "${1:-}" in
     *)
         usage
         ;;
-es:
+esac
