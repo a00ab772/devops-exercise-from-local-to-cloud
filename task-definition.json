@@ -6,6 +6,7 @@
   ],
   "cpu": "256",
   "memory": "512",
+  "executionRoleArn": "arn:aws:iam::__AWS_ACCOUNT_ID__:role/ecsTaskExecutionRole",
   "containerDefinitions": [
     {
       "name": "app",

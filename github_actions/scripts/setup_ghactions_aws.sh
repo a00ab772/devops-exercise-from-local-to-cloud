@@ -16,7 +16,7 @@ usage() {
     echo "Usage: $0 {provision|teardown}"
     echo
     echo "Options:"
-    echo "  provision : Creates ECR, ECS cluster, service, task definition, and IAM user, and pushes keys to GitHub Secrets."
+    echo "  provision : Creates ECR, ECS cluster, service, task definition, and IAM user, and pushes keys & account ID to GitHub Secrets."
     echo "  teardown  : Cleans up and deletes all created AWS resources (ECS, ECR, and IAM user)."
     exit 1
 }
@@ -92,7 +92,10 @@ provision() {
       ]
     }' >/dev/null || true
 
-    log "7. Generating Access Keys and updating GitHub Secrets automatically..."
+    log "7. Fetching AWS Account ID..."
+    AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query "Account" --output text)
+
+    log "8. Generating Access Keys and updating GitHub Secrets automatically..."
     # Clean up any existing keys for this user to avoid hitting limits
     KEYS=$(aws iam list-access-keys --user-name "$IAM_USER_NAME" --query 'AccessKeyMetadata[*].AccessKeyId' --output text 2>/dev/null || true)
     for kid in $KEYS; do
@@ -107,8 +110,9 @@ provision() {
     # Set secrets using GitHub CLI (gh) client-side encryption
     echo "$ACCESS_KEY_ID" | gh secret set AWS_ACCESS_KEY_ID
     echo "$SECRET_ACCESS_KEY" | gh secret set AWS_SECRET_ACCESS_KEY
+    echo "$AWS_ACCOUNT_ID" | gh secret set AWS_ACCOUNT_ID
 
-    log "GitHub Secrets 'AWS_ACCESS_KEY_ID' and 'AWS_SECRET_ACCESS_KEY' successfully configured!"
+    log "GitHub Secrets 'AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY' and 'AWS_ACCOUNT_ID' successfully configured!"
     log "Provisioning complete!"
 }
 
@@ -116,7 +120,7 @@ teardown() {
     log "1. Cleaning up ECS Service and Cluster..."
     aws ecs update-service --cluster "$ECS_CLUSTER_NAME" --service "$ECS_SERVICE_NAME" --desired-count 0 --region "$AWS_REGION" >/dev/null 2>&1 || true
     aws ecs delete-service --cluster "$ECS_CLUSTER_NAME" --service "$ECS_SERVICE_NAME" --force --region "$AWS_REGION" >/dev/null 2>&1 || true
-    aws ecs delete-cluster --cluster "$ECS_CLUSTER_NAME" --region "$AWS_REGION" >/dev/null || true
+    aws ecs delete-cluster --cluster "$ECS_CLUSTER_NAME" --region "$AWS_REGION" >/dev/null 2>&1 || true
 
     log "2. Deregistering ECS Task Definitions..."
     TASK_ARNS=$(aws ecs list-task-definitions --family-prefix "$ECS_TASK_FAMILY" --status ACTIVE --query "taskDefinitionArns" --output text --region "$AWS_REGION" 2>/dev/null || true)
@@ -159,4 +163,4 @@ case "${1:-}" in
     *)
         usage
         ;;
-esac
+es:
