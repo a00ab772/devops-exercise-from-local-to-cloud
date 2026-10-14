@@ -5,11 +5,7 @@ on:
   pull_request:
     branches: [ "main" ]
     types: [ closed ]
-
-  workflow_dispatch: # Allows GitHub action to be manually triggered.
-
-#  schedule:
-#    - cron: '0 0 * * *'
+  workflow_dispatch:
 
 env:
   AWS_REGION: us-east-1
@@ -23,9 +19,35 @@ permissions:
   contents: read
 
 jobs:
+  security_scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Code checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Trivy filesystem scan
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          format: json
+          exit-code: 0
+          vuln-type: os,library
+          output: trivy-results.json
+
+      - name: Upload Trivy scan results as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-scan-results
+          path: trivy-results.json
+
   deploy:
     name: Deploy
-    if: github.event.pull_request.merged == true
+    needs: security_scan
+    if: (github.event_name == 'pull_request' && github.event.pull_request.merged == true) || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     environment: production
 
@@ -39,16 +61,10 @@ jobs:
           distribution: 'temurin'
           java-version: '21'
 
-      - name: Run Maven Test in main branch
-        if: github.ref == 'refs/heads/main'
+      - name: Run Maven Test
         run: mvn test
 
-      - name: Don't run Maven Test in other branches
-        if: github.ref != 'refs/heads/main'
-        run: echo "Skipping unit tests in other branches different to main"
-
       - name: Run Checkstyle / Maven Verify
-        if: github.ref == 'refs/heads/main'
         run: mvn checkstyle:check verify
 
       - name: SonarQube Scan
@@ -80,9 +96,6 @@ jobs:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          # Build a docker container and
-          # push it to ECR so that it can
-          # be deployed to ECS.
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -f docker/dockerfiles/app/multistage/Dockerfile .
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
           echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
