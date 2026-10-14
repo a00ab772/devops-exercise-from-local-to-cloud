@@ -2,7 +2,7 @@
 set -euo pipefail
 
 AWS_REGION="${AWS_REGION:-us-east-1}"
-readonly ECR_REPO_NAME="devops-exercise-from-local-to-cloud-repo"
+readonly ECR_REPO_NAME="myapprepo"
 readonly ECS_CLUSTER_NAME="devops-exercise-from-local-to-cloud"
 readonly ECS_SERVICE_NAME="devops-exercise-from-local-to-cloud-service"
 readonly ECS_TASK_FAMILY="devops-exercise-from-local-to-cloud-task"
@@ -16,12 +16,23 @@ usage() {
     echo "Usage: $0 {provision|teardown}"
     echo
     echo "Options:"
-    echo "  provision : Creates ECR, ECS cluster, service, task definition, and IAM user for GitHub Actions."
+    echo "  provision : Creates ECR, ECS cluster, service, task definition, and IAM user, and pushes keys to GitHub Secrets."
     echo "  teardown  : Cleans up and deletes all created AWS resources (ECS, ECR, and IAM user)."
     exit 1
 }
 
 provision() {
+    # Check if GitHub CLI is installed and authenticated
+    if ! command -v gh &> /dev/null; then
+        log "Error: GitHub CLI ('gh') is not installed. Please install it to automatically set repository secrets."
+        exit 1
+    fi
+
+    if ! gh auth status &> /dev/null; then
+        log "Error: GitHub CLI is not authenticated. Run 'gh auth login' first."
+        exit 1
+    fi
+
     log "1. Creating ECR Repository: $ECR_REPO_NAME..."
     aws ecr describe-repositories --repository-names "$ECR_REPO_NAME" --region "$AWS_REGION" >/dev/null 2>&1 || \
     aws ecr create-repository --repository-name "$ECR_REPO_NAME" --region "$AWS_REGION" >/dev/null
@@ -81,18 +92,23 @@ provision() {
       ]
     }' >/dev/null || true
 
-    log "7. Generating Access Keys for GitHub Actions..."
-    aws iam create-access-key --user-name "$IAM_USER_NAME" --output json | \
-    python3 -c "
-import sys, json
-data = json.load(sys.stdin)
-key = data['AccessKey']
-print('--------------------------------------------------')
-print('Copy these into your GitHub Repository Secrets:')
-print('AWS_ACCESS_KEY_ID:     ', key['AccessKeyId'])
-print('AWS_SECRET_ACCESS_KEY: ', key['SecretAccessKey'])
-print('--------------------------------------------------')
-"
+    log "7. Generating Access Keys and updating GitHub Secrets automatically..."
+    # Clean up any existing keys for this user to avoid hitting limits
+    KEYS=$(aws iam list-access-keys --user-name "$IAM_USER_NAME" --query 'AccessKeyMetadata[*].AccessKeyId' --output text 2>/dev/null || true)
+    for kid in $KEYS; do
+        aws iam delete-access-key --user-name "$IAM_USER_NAME" --access-key-id "$kid" >/dev/null 2>&1 || true
+    done
+
+    # Create new access key
+    CREDENTIALS=$(aws iam create-access-key --user-name "$IAM_USER_NAME" --output json)
+    ACCESS_KEY_ID=$(echo "$CREDENTIALS" | python3 -c "import sys, json; print(json.load(sys.stdin)['AccessKey']['AccessKeyId'])")
+    SECRET_ACCESS_KEY=$(echo "$CREDENTIALS" | python3 -c "import sys, json; print(json.load(sys.stdin)['AccessKey']['SecretAccessKey'])")
+
+    # Set secrets using GitHub CLI (gh) client-side encryption
+    echo "$ACCESS_KEY_ID" | gh secret set AWS_ACCESS_KEY_ID
+    echo "$SECRET_ACCESS_KEY" | gh secret set AWS_SECRET_ACCESS_KEY
+
+    log "GitHub Secrets 'AWS_ACCESS_KEY_ID' and 'AWS_SECRET_ACCESS_KEY' successfully configured!"
     log "Provisioning complete!"
 }
 
@@ -100,7 +116,7 @@ teardown() {
     log "1. Cleaning up ECS Service and Cluster..."
     aws ecs update-service --cluster "$ECS_CLUSTER_NAME" --service "$ECS_SERVICE_NAME" --desired-count 0 --region "$AWS_REGION" >/dev/null 2>&1 || true
     aws ecs delete-service --cluster "$ECS_CLUSTER_NAME" --service "$ECS_SERVICE_NAME" --force --region "$AWS_REGION" >/dev/null 2>&1 || true
-    aws ecs delete-cluster --cluster "$ECS_CLUSTER_NAME" --region "$AWS_REGION" >/dev/null 2>&1 || true
+    aws ecs delete-cluster --cluster "$ECS_CLUSTER_NAME" --region "$AWS_REGION" >/dev/null || true
 
     log "2. Deregistering ECS Task Definitions..."
     TASK_ARNS=$(aws ecs list-task-definitions --family-prefix "$ECS_TASK_FAMILY" --status ACTIVE --query "taskDefinitionArns" --output text --region "$AWS_REGION" 2>/dev/null || true)
