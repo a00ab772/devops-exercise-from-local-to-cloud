@@ -5,7 +5,8 @@ set -euo pipefail
 # Configuration Variables
 AWS_REGION="${AWS_REGION:-us-east-1}"
 readonly SECURITY_GROUP_NAME="jenkins-devsecops-sg"
-readonly INSTANCE_TYPE="t4g.small"
+readonly INSTANCE_TYPE_HEAVY="t4g.small"
+readonly INSTANCE_TYPE_LIGHT="t4g.micro"
 readonly ROLE_NAME="EC2ShutdownRole"
 readonly PROFILE_NAME="EC2ShutdownProfile"
 readonly TAG_NAME_JENKINS="Jenkins-Server"
@@ -336,7 +337,7 @@ exec > >(tee /var/log/user-data.log|logger) 2>&1
 
 log() { echo "[User-Data] $1"; }
 
-log "Configuring 1GB Swap space for t4g.small..."
+log "Configuring 1GB Swap space for t4g.micro..."
 fallocate -l 1G /swapfile
 chmod 600 /swapfile
 mkswap /swapfile
@@ -419,11 +420,11 @@ provision() {
     log "Waiting 10 seconds for IAM profile propagation..."
     sleep 10
 
-    log "Launching Instance 1: Jenkins Server (t4g.small)..."
+    log "Launching Instance 1: Jenkins Server ($INSTANCE_TYPE_HEAVY)..."
     ID_JENKINS=$(aws ec2 run-instances \
         --image-id "$AMI_ID" \
         --count 1 \
-        --instance-type "$INSTANCE_TYPE" \
+        --instance-type "$INSTANCE_TYPE_HEAVY" \
         --security-group-ids "$SG_ID" \
         --iam-instance-profile "Name=$PROFILE_NAME" \
         --user-data file://user-data-jenkins.sh \
@@ -431,11 +432,11 @@ provision() {
         --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=$TAG_NAME_JENKINS}]" \
         --query 'Instances[0].InstanceId' --output text --region "$AWS_REGION")
 
-    log "Launching Instance 2: SonarQube Server (t4g.small)..."
+    log "Launching Instance 2: SonarQube Server ($INSTANCE_TYPE_HEAVY)..."
     ID_SQ=$(aws ec2 run-instances \
         --image-id "$AMI_ID" \
         --count 1 \
-        --instance-type "$INSTANCE_TYPE" \
+        --instance-type "$INSTANCE_TYPE_HEAVY" \
         --security-group-ids "$SG_ID" \
         --iam-instance-profile "Name=$PROFILE_NAME" \
         --user-data file://user-data-sonarqube.sh \
@@ -443,11 +444,11 @@ provision() {
         --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=$TAG_NAME_SONARQUBE}]" \
         --query 'Instances[0].InstanceId' --output text --region "$AWS_REGION")
 
-    log "Launching Instance 3: Prometheus & Grafana Server (t4g.small)..."
+    log "Launching Instance 3: Prometheus & Grafana Server ($INSTANCE_TYPE_LIGHT)..."
     ID_PROM_GRAFANA=$(aws ec2 run-instances \
         --image-id "$AMI_ID" \
         --count 1 \
-        --instance-type "$INSTANCE_TYPE" \
+        --instance-type "$INSTANCE_TYPE_LIGHT" \
         --security-group-ids "$SG_ID" \
         --iam-instance-profile "Name=$PROFILE_NAME" \
         --user-data file://user-data-prometheus-grafana.sh \
