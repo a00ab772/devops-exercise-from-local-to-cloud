@@ -1,3 +1,17 @@
+# Index
+
+* [Project overview](#project-overview)
+* [Application architecture](#application-architecture)
+* [Local provisioning of the above Dynamic Web Architecture using Vagrant](#local-provisioning-of-the-above-dynamic-web-architecture-using-vagrant)
+* [Lift and shift AWS cloud provisioning of a Static Web Application](#lift-and-shift-aws-cloud-provisioning-of-a-static-web-application)
+* [Re-factoring AWS cloud provisioning of our Dynamic Web Application](#re-factoring-aws-cloud-provisioning-of-our-dynamic-web-application)
+* [Continuous Integration and Continuous Delivery](#continuous-integration-and-continuous-delivery)
+  * [Jenkins](#jenkins)
+    * [CI with Jenkins](#ci-with-jenkins)
+    * [Docker CI with Jenkins](#docker-ci-with-jenkins)
+  * [GitHub actions](#github-actions)
+* [Monitoring and Observability](#monitoring-and-observability)
+
 # Project overview
 
 This project is a comprehensive guide to setting up and managing a development environment to deploy a sample application from local to production.
@@ -65,19 +79,13 @@ Let's do a step by step walkthrought of the process deploying the static web app
 
 [Docker CI/CD using Jenkins](docker/README.md)
 
-
 ## GitHub actions
 
 [CI/CD with GitHub actions](github_actions/README.md)
 
-To be continued ....
+# Monitoring and Observability
 
-(IAAC: Ansible, Terraform, CloudFormation)
-(PAAS and SAAS: RDS, VPC, IAM, Security Groups, Route53, CloudFront, ELB, S3, EKS, ECR, ECS)
-
-
-## GitHub actions
-
+[Monitoring and observabiity](monitoring-and-observability/README.md)
 
 # Kubernetes cloud provisioning
 
@@ -87,3 +95,25 @@ To be continued ....
 # Terraform GCP Automated Provisioning
 
 ...
+
+To be continued ....
+
+(IAAC: Ansible, Terraform, CloudFormation)
+(PAAS and SAAS: RDS, VPC, IAM, Security Groups, Route53, CloudFront, ELB, S3, EKS, ECR, ECS)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

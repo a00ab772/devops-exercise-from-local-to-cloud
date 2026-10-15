@@ -7,7 +7,7 @@ In this section, we will provide a detailed explanation of how we implement Dock
 
 # Docker CI/CD environment setup
 
-The steps are pretty much the same as you did in [../jenkins/README.md](../jenkins/README.md), except that you don't need the Nexus server up and running so we will be spinning the Jenkins CI/CD infrastructure using the [scripts/docker_jenkins_cicd_setup.sh](scripts/docker_jenkins_cicd_setup.sh)script:
+The steps are pretty much the same as you did in [../jenkins/README.md](../jenkins/README.md), except that you don't need the Nexus server up and running so we will be spinning the Jenkins CI/CD infrastructure using the [scripts/docker_jenkins_cicd_setup.sh](scripts/docker_jenkins_cicd_setup.sh) script:
 
 ```bash
 user@DESKTOP-SCNMK3I UCRT64 ~/Documents/devops-exercise-from-local-to-cloud/docker/scripts (main)
