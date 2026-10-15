@@ -150,6 +150,75 @@ The components that we will spin this lab are pretty much the same as you did in
 
 ![jenkins_cicd_in_docker_monitoring_and_observability.drawio.png](images/jenkins_cicd_in_docker_monitoring_and_observability.drawio.png)
 
- You can spin it up using the provided [scripts/docker_jenkins_cicd_monitoring_setup.sh](scripts/docker_jenkins_cicd_monitoring_setup.sh) script.
+ You can spin it up using the provided [scripts/docker_jenkins_cicd_monitoring_setup.sh](scripts/docker_jenkins_cicd_monitoring_setup.sh) script:
+
+```bash
+
+user@DESKTOP-SCNMK3I UCRT64 ~/Documents/devops-exercise-from-local-to-cloud/monitoring-and-observability/scripts (main)
+Thu Oct 15 15:56:15
+$ ./docker_jenkins_cicd_monitoring_setup.sh
+Usage: ./docker_jenkins_cicd_monitoring_setup.sh {provision|teardown|update-ip}
+
+Options:
+  provision  : Deploys IAM roles, S3 bucket, Security Group, EC2 instances, IAM user, ECR, and ECS resources.
+  teardown   : Terminates EC2 instances, cleans up AWS resources including IAM user, ECR, and ECS resources.
+  update-ip  : Fetches your local machine's current public IP via curl,
+               clears out stale ingress rules in the Security Group, and
+               authorizes the new IP (ports 22, 3000, 8080, 9000, 9090) plus
+               self-referencing traffic between instances.
+
+
+
+user@DESKTOP-SCNMK3I UCRT64 ~/Documents/devops-exercise-from-local-to-cloud/monitoring-and-observability/scripts (main)
+Thu Oct 15 15:57:54
+$ ./docker_jenkins_cicd_monitoring_setup.sh provision
+[2026-10-15 16:15:00] Verifying AWS CLI authentication using profile 'default'...
+[2026-10-15 16:15:01] AWS authentication successful.
+[2026-10-15 16:15:01] Checking/Creating Security Group...
+[2026-10-15 16:15:05] Verifying AWS CLI authentication using profile 'default'...
+[2026-10-15 16:15:07] AWS authentication successful.
+[2026-10-15 16:15:07] Locating Security Group: jenkins-devsecops-sg...
+[2026-10-15 16:15:08] Fetching your local public IP address...
+[2026-10-15 16:15:08] Current local public IP resolved to: 89.6.2**.132/32
+[2026-10-15 16:15:08] Revoking existing inbound rules...
+[2026-10-15 16:15:10] Authorizing inbound access for your IP (89.6.2**.132/32) on ports 22, 3000, 8080, 9000, 9090...
+[2026-10-15 16:15:17] Authorizing self-referencing internal traffic for ports 3000, 8080, 9000, 9090...
+[2026-10-15 16:15:23] Security group successfully updated!
+[2026-10-15 16:15:23] Checking/Configuring IAM Instance Profile...
+[2026-10-15 16:15:32] Waiting for IAM instance profile propagation...
+[2026-10-15 16:15:33] Checking/Creating IAM user 'jenkins'...
+[2026-10-15 16:15:35] Attaching policies to IAM user 'jenkins'...
+[2026-10-15 16:15:38] Generating Access Keys for 'jenkins' user...
+----------------------------------------
+Access Key ID:      AKIA**********QJRFF
+Secret Access Key:  rq4vi7***********Jdj8l8/H
+----------------------------------------
+[2026-10-15 16:15:39] Checking/Creating ECR Repository: myapprepo...
+[2026-10-15 16:15:41] Creating ECS Cluster: devops-exercise-from-local-to-cloud...
+[2026-10-15 16:15:42] Registering initial placeholder Task Definition: devops-exercise-from-local-to-cloud-task...
+[2026-10-15 16:15:43] Creating ECS Service: devops-exercise-from-local-to-cloud-service...
+[2026-10-15 16:15:48] The zip file already exists in s3://jenkins-sonarqube-binaries-16422/. Skipping upload.
+[2026-10-15 16:15:48] Fetching latest Ubuntu ARM64 AMI...
+[2026-10-15 16:15:50] Waiting 10 seconds for IAM profile propagation...
+[2026-10-15 16:16:00] Launching Instance 1: Jenkins Server (t4g.small)...
+[2026-10-15 16:16:03] Launching Instance 2: SonarQube Server (t4g.small)...
+[2026-10-15 16:16:05] Launching Instance 3: Prometheus & Grafana Server (t4g.micro)...
+[2026-10-15 16:16:08] Successfully provisioned all instances, ECR, and ECS resources!
+[2026-10-15 16:16:08] Jenkins Instance ID: i-09***********32c
+[2026-10-15 16:16:08] SonarQube Instance ID: i-0cb***********5a8
+[2026-10-15 16:16:08] Prometheus & Grafana Instance ID: i-0b01***********e39
+```
+
+To complete the Jenkins and SonarQube configuration you can quickly follow the steps seen in [../docker/README.md](../docker/README.md)
+
+Let's access the Prometheus public IP (port 9090):
+
+![prometheus_9090](images/prometheus_9090.png)
+
+Let's access the Grafana public IP, default username and password is `admin`:
+
+![grafana_3000](images/grafana_3000.png)
+
+![grafana_3000_01](images/grafana_3000_01.png)
 
 (WIP)

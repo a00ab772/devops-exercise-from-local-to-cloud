@@ -3,5 +3,6 @@ target
 *.bkp
 *.pem
 *.backup
+user-data-*.sh
 sonarqube-*.zipjenkins/scripts/*.zip
 sonarqube-26.9.0.129388.zip

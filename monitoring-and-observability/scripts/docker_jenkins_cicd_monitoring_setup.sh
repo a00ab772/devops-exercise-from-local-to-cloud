@@ -17,9 +17,20 @@ readonly ECS_CLUSTER_NAME="devops-exercise-from-local-to-cloud"
 readonly ECS_SERVICE_NAME="devops-exercise-from-local-to-cloud-service"
 readonly ECS_TASK_FAMILY="devops-exercise-from-local-to-cloud-task"
 readonly ECR_REPO_NAME="myapprepo"
+readonly AWS_CLI_PROFILE="${AWS_PROFILE:-default}"
 
 log() {
     echo "[$(date +'%Y-%m-%d %H:%M:%S')] $1" >&2
+}
+
+verify_aws_auth() {
+    log "Verifying AWS CLI authentication using profile '$AWS_CLI_PROFILE'..."
+    if ! aws sts get-caller-identity --profile "$AWS_CLI_PROFILE" >/dev/null 2>&1; then
+        log "Error: AWS CLI is not properly authenticated or profile '$AWS_CLI_PROFILE' is missing valid credentials."
+        log "Please ensure your credentials are configured correctly (e.g., via 'aws configure' or environment variables)."
+        exit 1
+    fi
+    log "AWS authentication successful."
 }
 
 usage() {
@@ -36,8 +47,9 @@ usage() {
 }
 
 update_security_group_ip() {
+    verify_aws_auth
     log "Locating Security Group: $SECURITY_GROUP_NAME..."
-    SG_ID=$(aws ec2 describe-security-groups --group-names "$SECURITY_GROUP_NAME" --region "$AWS_REGION" --query 'SecurityGroups[0].GroupId' --output text 2>/dev/null || true)
+    SG_ID=$(aws ec2 describe-security-groups --group-names "$SECURITY_GROUP_NAME" --region "$AWS_REGION" --profile "$AWS_CLI_PROFILE" --query 'SecurityGroups[0].GroupId' --output text 2>/dev/null || true)
 
     if [ -z "$SG_ID" ] || [ "$SG_ID" == "None" ]; then
         log "Security group '$SECURITY_GROUP_NAME' does not exist yet. Run 'provision' first."
@@ -54,20 +66,20 @@ update_security_group_ip() {
     log "Current local public IP resolved to: $MY_IP_CIDR"
 
     log "Revoking existing inbound rules..."
-    EXISTING_RULES=$(aws ec2 describe-security-groups --group-ids "$SG_ID" --region "$AWS_REGION" --query 'SecurityGroups[0].IpPermissions' --output json)
+    EXISTING_RULES=$(aws ec2 describe-security-groups --group-ids "$SG_ID" --region "$AWS_REGION" --profile "$AWS_CLI_PROFILE" --query 'SecurityGroups[0].IpPermissions' --output json)
 
     if [ "$EXISTING_RULES" != "[]" ] && [ -n "$EXISTING_RULES" ]; then
-        aws ec2 revoke-security-group-ingress --group-id "$SG_ID" --ip-permissions "$EXISTING_RULES" --region "$AWS_REGION" >/dev/null || true
+        aws ec2 revoke-security-group-ingress --group-id "$SG_ID" --ip-permissions "$EXISTING_RULES" --region "$AWS_REGION" --profile "$AWS_CLI_PROFILE" >/dev/null || true
     fi
 
     log "Authorizing inbound access for your IP ($MY_IP_CIDR) on ports 22, 3000, 8080, 9000, 9090..."
     for port in 22 3000 8080 9000 9090; do
-        aws ec2 authorize-security-group-ingress --group-id "$SG_ID" --protocol tcp --port "$port" --cidr "$MY_IP_CIDR" --region "$AWS_REGION" >/dev/null
+        aws ec2 authorize-security-group-ingress --group-id "$SG_ID" --protocol tcp --port "$port" --cidr "$MY_IP_CIDR" --region "$AWS_REGION" --profile "$AWS_CLI_PROFILE" >/dev/null
     done
 
     log "Authorizing self-referencing internal traffic for ports 3000, 8080, 9000, 9090..."
     for port in 3000 8080 9000 9090; do
-        aws ec2 authorize-security-group-ingress --group-id "$SG_ID" --protocol tcp --port "$port" --source-group "$SG_ID" --region "$AWS_REGION" >/dev/null
+        aws ec2 authorize-security-group-ingress --group-id "$SG_ID" --protocol tcp --port "$port" --source-group "$SG_ID" --region "$AWS_REGION" --profile "$AWS_CLI_PROFILE" >/dev/null
     done
 
     log "Security group successfully updated!"
@@ -75,10 +87,10 @@ update_security_group_ip() {
 
 create_security_group() {
     log "Checking/Creating Security Group..."
-    if ! SG_ID=$(aws ec2 describe-security-groups --group-names "$SECURITY_GROUP_NAME" --region "$AWS_REGION" --query 'SecurityGroups[0].GroupId' --output text 2>/dev/null); then
+    if ! SG_ID=$(aws ec2 describe-security-groups --group-names "$SECURITY_GROUP_NAME" --region "$AWS_REGION" --profile "$AWS_CLI_PROFILE" --query 'SecurityGroups[0].GroupId' --output text 2>/dev/null); then
         SG_ID=$(aws ec2 create-security-group --group-name "$SECURITY_GROUP_NAME" \
             --description "SG for Jenkins, SonarQube, and Prometheus/Grafana Instances" \
-            --query 'GroupId' --output text --region "$AWS_REGION")
+            --query 'GroupId' --output text --region "$AWS_REGION" --profile "$AWS_CLI_PROFILE")
     fi
 
     update_security_group_ip
@@ -87,40 +99,42 @@ create_security_group() {
 
 setup_iam_profile() {
     log "Checking/Configuring IAM Instance Profile..."
-    if ! aws iam get-role --role-name "$ROLE_NAME" >/dev/null 2>&1; then
-        aws iam create-role --role-name "$ROLE_NAME" --assume-role-policy-document '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"ec2.amazonaws.com"},"Action":"sts:AssumeRole"}]}' >/dev/null
-        aws iam attach-role-policy --role-name "$ROLE_NAME" --policy-arn arn:aws:iam::aws:policy/AmazonEC2FullAccess >/dev/null
+    if ! aws iam get-role --role-name "$ROLE_NAME" --profile "$AWS_CLI_PROFILE" >/dev/null 2>&1; then
+        aws iam create-role --role-name "$ROLE_NAME" --profile "$AWS_CLI_PROFILE" --assume-role-policy-document '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"ec2.amazonaws.com"},"Action":"sts:AssumeRole"}]}' >/dev/null
+        aws iam attach-role-policy --role-name "$ROLE_NAME" --policy-arn arn:aws:iam::aws:policy/AmazonEC2FullAccess --profile "$AWS_CLI_PROFILE" >/dev/null
     fi
 
-    aws iam attach-role-policy --role-name "$ROLE_NAME" --policy-arn arn:aws:iam::aws:policy/AmazonS3FullAccess >/dev/null || true
-    aws iam attach-role-policy --role-name "$ROLE_NAME" --policy-arn arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryPowerUser >/dev/null || true
+    aws iam attach-role-policy --role-name "$ROLE_NAME" --policy-arn arn:aws:iam::aws:policy/AmazonS3FullAccess --profile "$AWS_CLI_PROFILE" >/dev/null || true
+    aws iam attach-role-policy --role-name "$ROLE_NAME" --policy-arn arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryPowerUser --profile "$AWS_CLI_PROFILE" >/dev/null || true
 
-    if ! aws iam get-instance-profile --instance-profile-name "$PROFILE_NAME" >/dev/null 2>&1; then
-        aws iam create-instance-profile --instance-profile-name "$PROFILE_NAME" >/dev/null
-        aws iam add-role-to-instance-profile --instance-profile-name "$PROFILE_NAME" --role-name "$ROLE_NAME" >/dev/null
+    if ! aws iam get-instance-profile --instance-profile-name "$PROFILE_NAME" --profile "$AWS_CLI_PROFILE" >/dev/null 2>&1; then
+        aws iam create-instance-profile --instance-profile-name "$PROFILE_NAME" --profile "$AWS_CLI_PROFILE" >/dev/null
+        aws iam add-role-to-instance-profile --instance-profile-name "$PROFILE_NAME" --role-name "$ROLE_NAME" --profile "$AWS_CLI_PROFILE" >/dev/null
     fi
 
     log "Waiting for IAM instance profile propagation..."
-    aws iam wait instance-profile-exists --instance-profile-name "$PROFILE_NAME"
+    aws iam wait instance-profile-exists --instance-profile-name "$PROFILE_NAME" --profile "$AWS_CLI_PROFILE"
 }
 
 create_jenkins_iam_user() {
     log "Checking/Creating IAM user 'jenkins'..."
-    if ! aws iam get-user --user-name jenkins >/dev/null 2>&1; then
-        aws iam create-user --user-name jenkins >/dev/null
+    if ! aws iam get-user --user-name jenkins --profile "$AWS_CLI_PROFILE" >/dev/null 2>&1; then
+        aws iam create-user --user-name jenkins --profile "$AWS_CLI_PROFILE" >/dev/null
     fi
 
     log "Attaching policies to IAM user 'jenkins'..."
     aws iam attach-user-policy \
         --user-name jenkins \
-        --policy-arn arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryFullAccess >/dev/null 2>&1 || true
+        --policy-arn arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryFullAccess \
+        --profile "$AWS_CLI_PROFILE" >/dev/null 2>&1 || true
 
     aws iam attach-user-policy \
         --user-name jenkins \
-        --policy-arn arn:aws:iam::aws:policy/AmazonECS_FullAccess >/dev/null 2>&1 || true
+        --policy-arn arn:aws:iam::aws:policy/AmazonECS_FullAccess \
+        --profile "$AWS_CLI_PROFILE" >/dev/null 2>&1 || true
 
     log "Generating Access Keys for 'jenkins' user..."
-    aws iam create-access-key --user-name jenkins --output json | \
+    aws iam create-access-key --user-name jenkins --profile "$AWS_CLI_PROFILE" --output json | \
     python3 -c "
 import sys, json
 data = json.load(sys.stdin)
@@ -134,13 +148,13 @@ print('----------------------------------------')
 
 setup_ecr_repository() {
     log "Checking/Creating ECR Repository: $ECR_REPO_NAME..."
-    aws ecr describe-repositories --repository-names "$ECR_REPO_NAME" --region "$AWS_REGION" >/dev/null 2>&1 || \
-    aws ecr create-repository --repository-name "$ECR_REPO_NAME" --region "$AWS_REGION" >/dev/null
+    aws ecr describe-repositories --repository-names "$ECR_REPO_NAME" --region "$AWS_REGION" --profile "$AWS_CLI_PROFILE" >/dev/null 2>&1 || \
+    aws ecr create-repository --repository-name "$ECR_REPO_NAME" --region "$AWS_REGION" --profile "$AWS_CLI_PROFILE" >/dev/null
 }
 
 setup_ecs_resources() {
     log "Creating ECS Cluster: $ECS_CLUSTER_NAME..."
-    aws ecs create-cluster --cluster-name "$ECS_CLUSTER_NAME" --region "$AWS_REGION" >/dev/null || true
+    aws ecs create-cluster --cluster-name "$ECS_CLUSTER_NAME" --region "$AWS_REGION" --profile "$AWS_CLI_PROFILE" >/dev/null || true
 
     log "Registering initial placeholder Task Definition: $ECS_TASK_FAMILY..."
     aws ecs register-task-definition \
@@ -157,10 +171,10 @@ setup_ecs_resources() {
                 \"hostPort\": 8080
             }]
         }]" \
-        --region "$AWS_REGION" >/dev/null || true
+        --region "$AWS_REGION" --profile "$AWS_CLI_PROFILE" >/dev/null || true
 
     log "Creating ECS Service: $ECS_SERVICE_NAME..."
-    DEFAULT_SUBNET=$(aws ec2 describe-subnets --filters "Name=default-for-az,Values=true" --query "Subnets[0].SubnetId" --output text --region "$AWS_REGION" 2>/dev/null || true)
+    DEFAULT_SUBNET=$(aws ec2 describe-subnets --filters "Name=default-for-az,Values=true" --query "Subnets[0].SubnetId" --output text --region "$AWS_REGION" --profile "$AWS_CLI_PROFILE" 2>/dev/null || true)
 
     if [ -n "$DEFAULT_SUBNET" ] && [ "$DEFAULT_SUBNET" != "None" ]; then
         aws ecs create-service \
@@ -170,15 +184,15 @@ setup_ecs_resources() {
             --desired-count 1 \
             --launch-type FARGATE \
             --network-configuration "awsvpcConfiguration={subnets=[$DEFAULT_SUBNET],securityGroups=[$SG_ID],assignPublicIp=ENABLED}" \
-            --region "$AWS_REGION" >/dev/null || true
+            --region "$AWS_REGION" --profile "$AWS_CLI_PROFILE" >/dev/null || true
     fi
 }
 
 upload_binary_to_s3() {
-    EXISTING_BUCKET=$(aws s3api list-buckets --query "Buckets[?starts_with(Name, 'jenkins-sonarqube-binaries-')].Name" --output text 2>/dev/null || true)
+    EXISTING_BUCKET=$(aws s3api list-buckets --profile "$AWS_CLI_PROFILE" --query "Buckets[?starts_with(Name, 'jenkins-sonarqube-binaries-')].Name" --output text 2>/dev/null || true)
 
     if [ -n "$EXISTING_BUCKET" ] && [ "$EXISTING_BUCKET" != "None" ]; then
-        if aws s3 ls "s3://$EXISTING_BUCKET/sonarqube.zip" --region "$AWS_REGION" >/dev/null 2>&1; then
+        if aws s3 ls "s3://$EXISTING_BUCKET/sonarqube.zip" --region "$AWS_REGION" --profile "$AWS_CLI_PROFILE" >/dev/null 2>&1; then
             log "The zip file already exists in s3://$EXISTING_BUCKET/. Skipping upload."
             export ACTIVE_S3_BUCKET="$EXISTING_BUCKET"
             return 0
@@ -189,13 +203,13 @@ upload_binary_to_s3() {
 
     log "Creating a new S3 bucket temporarily: $S3_BUCKET_NAME..."
     if [ "$AWS_REGION" == "us-east-1" ]; then
-        aws s3api create-bucket --bucket "$S3_BUCKET_NAME" --region "$AWS_REGION" >/dev/null
+        aws s3api create-bucket --bucket "$S3_BUCKET_NAME" --region "$AWS_REGION" --profile "$AWS_CLI_PROFILE" >/dev/null
     else
-        aws s3api create-bucket --bucket "$S3_BUCKET_NAME" --region "$AWS_REGION" --create-bucket-configuration LocationConstraint="$AWS_REGION" >/dev/null
+        aws s3api create-bucket --bucket "$S3_BUCKET_NAME" --region "$AWS_REGION" --profile "$AWS_CLI_PROFILE" --create-bucket-configuration LocationConstraint="$AWS_REGION" >/dev/null
     fi
 
     log "Uploading the SonarQube zip to s3://$S3_BUCKET_NAME/..."
-    aws s3 cp sonarqube-26.9.0.129388.zip "s3://$S3_BUCKET_NAME/sonarqube.zip"
+    aws s3 cp sonarqube-26.9.0.129388.zip "s3://$S3_BUCKET_NAME/sonarqube.zip" --profile "$AWS_CLI_PROFILE"
     export ACTIVE_S3_BUCKET="$S3_BUCKET_NAME"
 }
 
@@ -235,6 +249,15 @@ curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
 apt-get install -y nodejs
 
 apt-get update -y && apt-get install -y jenkins
+
+log "Bypassing Jenkins Setup Wizard via systemd override..."
+mkdir -p /etc/systemd/system/jenkins.service.d
+cat << 'EOT' > /etc/systemd/system/jenkins.service.d/override.conf
+[Service]
+Environment="JENKINS_JAVA_OPTIONS=-Djenkins.install.runSetupWizard=false"
+EOT
+
+systemctl daemon-reload
 systemctl enable --now jenkins
 
 sudo usermod -aG docker jenkins
@@ -337,6 +360,11 @@ exec > >(tee /var/log/user-data.log|logger) 2>&1
 
 log() { echo "[User-Data] $1"; }
 
+log "Syncing system time..."
+apt-get update -y && apt-get install -y chrony
+systemctl enable --now chronyd || systemctl enable --now chrony
+chronyc -a makestep
+
 log "Configuring 1GB Swap space for t4g.micro..."
 fallocate -l 1G /swapfile
 chmod 600 /swapfile
@@ -362,6 +390,18 @@ cp -r "prometheus-${PROM_VERSION}.linux-arm64/consoles" /etc/prometheus/
 cp -r "prometheus-${PROM_VERSION}.linux-arm64/console_libraries" /etc/prometheus/
 chown -R prometheus:prometheus /etc/prometheus/consoles /etc/prometheus/console_libraries
 rm -rf "prometheus-${PROM_VERSION}.linux-arm64*"
+
+log "Creating Prometheus configuration file..."
+cat << 'EOT' > /etc/prometheus/prometheus.yml
+global:
+  scrape_interval: 15s
+scrape_configs:
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+EOT
+
+chown prometheus:prometheus /etc/prometheus/prometheus.yml
 
 cat << 'EOT' > /etc/systemd/system/prometheus.service
 [Unit]
@@ -391,6 +431,7 @@ wget -q -O /etc/apt/keyrings/grafana.key https://apt.grafana.com/gpg.key
 echo "deb [signed-by=/etc/apt/keyrings/grafana.key] https://apt.grafana.com stable main" | tee /etc/apt/sources.list.d/grafana.list
 apt-get update -y
 apt-get install -y grafana
+systemctl daemon-reload
 systemctl enable --now grafana-server
 
 log "Setting up daily shutdown cron job..."
@@ -403,6 +444,7 @@ EOF
 }
 
 provision() {
+    verify_aws_auth
     SG_ID=$(create_security_group)
     setup_iam_profile
     create_jenkins_iam_user
@@ -415,7 +457,7 @@ provision() {
     generate_user_data_prometheus_grafana
 
     log "Fetching latest Ubuntu ARM64 AMI..."
-    AMI_ID=$(aws ec2 describe-images --region "$AWS_REGION" --owners 099720109477 --filters "Name=name,Values=ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-arm64-server-*" "Name=state,Values=available" --query "sort_by(Images, &CreationDate)[-1].ImageId" --output text)
+    AMI_ID=$(aws ec2 describe-images --region "$AWS_REGION" --profile "$AWS_CLI_PROFILE" --owners 099720109477 --filters "Name=name,Values=ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-arm64-server-*" "Name=state,Values=available" --query "sort_by(Images, &CreationDate)[-1].ImageId" --output text)
 
     log "Waiting 10 seconds for IAM profile propagation..."
     sleep 10
@@ -430,7 +472,7 @@ provision() {
         --user-data file://user-data-jenkins.sh \
         --block-device-mappings '[{"DeviceName":"/dev/sda1","Ebs":{"VolumeSize":20,"VolumeType":"gp3"}}]' \
         --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=$TAG_NAME_JENKINS}]" \
-        --query 'Instances[0].InstanceId' --output text --region "$AWS_REGION")
+        --query 'Instances[0].InstanceId' --output text --region "$AWS_REGION" --profile "$AWS_CLI_PROFILE")
 
     log "Launching Instance 2: SonarQube Server ($INSTANCE_TYPE_HEAVY)..."
     ID_SQ=$(aws ec2 run-instances \
@@ -442,7 +484,7 @@ provision() {
         --user-data file://user-data-sonarqube.sh \
         --block-device-mappings '[{"DeviceName":"/dev/sda1","Ebs":{"VolumeSize":20,"VolumeType":"gp3"}}]' \
         --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=$TAG_NAME_SONARQUBE}]" \
-        --query 'Instances[0].InstanceId' --output text --region "$AWS_REGION")
+        --query 'Instances[0].InstanceId' --output text --region "$AWS_REGION" --profile "$AWS_CLI_PROFILE")
 
     log "Launching Instance 3: Prometheus & Grafana Server ($INSTANCE_TYPE_LIGHT)..."
     ID_PROM_GRAFANA=$(aws ec2 run-instances \
@@ -454,7 +496,7 @@ provision() {
         --user-data file://user-data-prometheus-grafana.sh \
         --block-device-mappings '[{"DeviceName":"/dev/sda1","Ebs":{"VolumeSize":20,"VolumeType":"gp3"}}]' \
         --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=$TAG_NAME_PROM_GRAFANA}]" \
-        --query 'Instances[0].InstanceId' --output text --region "$AWS_REGION")
+        --query 'Instances[0].InstanceId' --output text --region "$AWS_REGION" --profile "$AWS_CLI_PROFILE")
 
     log "Successfully provisioned all instances, ECR, and ECS resources!"
     log "Jenkins Instance ID: $ID_JENKINS"
@@ -463,15 +505,16 @@ provision() {
 }
 
 teardown() {
+    verify_aws_auth
     log "Locating and terminating instances..."
     for TAG in "$TAG_NAME_JENKINS" "$TAG_NAME_SONARQUBE" "$TAG_NAME_PROM_GRAFANA"; do
         INSTANCE_ID=$(aws ec2 describe-instances \
             --filters "Name=tag:Name,Values=$TAG" "Name=instance-state-name,Values=pending,running,stopped,stopping" \
-            --query "Reservations[*].Instances[*].InstanceId" --output text --region "$AWS_REGION" 2>/dev/null || true)
+            --query "Reservations[*].Instances[*].InstanceId" --output text --region "$AWS_REGION" --profile "$AWS_CLI_PROFILE" 2>/dev/null || true)
 
         if [ -n "$INSTANCE_ID" ] && [ "$INSTANCE_ID" != "None" ]; then
             log "Terminating instance $INSTANCE_ID ($TAG)..."
-            aws ec2 terminate-instances --instance-ids "$INSTANCE_ID" --region "$AWS_REGION" >/dev/null
+            aws ec2 terminate-instances --instance-ids "$INSTANCE_ID" --region "$AWS_REGION" --profile "$AWS_CLI_PROFILE" >/dev/null
         fi
     done
 
@@ -479,41 +522,41 @@ teardown() {
     sleep 15
 
     log "Cleaning up ECS Service and Cluster..."
-    aws ecs update-service --cluster "$ECS_CLUSTER_NAME" --service "$ECS_SERVICE_NAME" --desired-count 0 --region "$AWS_REGION" >/dev/null 2>&1 || true
-    aws ecs delete-service --cluster "$ECS_CLUSTER_NAME" --service "$ECS_SERVICE_NAME" --force --region "$AWS_REGION" >/dev/null 2>&1 || true
-    aws ecs delete-cluster --cluster "$ECS_CLUSTER_NAME" --region "$AWS_REGION" >/dev/null 2>&1 || true
+    aws ecs update-service --cluster "$ECS_CLUSTER_NAME" --service "$ECS_SERVICE_NAME" --desired-count 0 --region "$AWS_REGION" --profile "$AWS_CLI_PROFILE" >/dev/null 2>&1 || true
+    aws ecs delete-service --cluster "$ECS_CLUSTER_NAME" --service "$ECS_SERVICE_NAME" --force --region "$AWS_REGION" --profile "$AWS_CLI_PROFILE" >/dev/null 2>&1 || true
+    aws ecs delete-cluster --cluster "$ECS_CLUSTER_NAME" --region "$AWS_REGION" --profile "$AWS_CLI_PROFILE" >/dev/null 2>&1 || true
 
     log "Deregistering ECS Task Definitions..."
-    TASK_ARNS=$(aws ec2 list-task-definitions --family-prefix "$ECS_TASK_FAMILY" --status ACTIVE --query "taskDefinitionArns" --output text --region "$AWS_REGION" 2>/dev/null || true)
+    TASK_ARNS=$(aws ec2 list-task-definitions --family-prefix "$ECS_TASK_FAMILY" --status ACTIVE --query "taskDefinitionArns" --output text --region "$AWS_REGION" --profile "$AWS_CLI_PROFILE" 2>/dev/null || true)
     for task_arn in $TASK_ARNS; do
         if [ -n "$task_arn" ] && [ "$task_arn" != "None" ]; then
             log "Deregistering task definition: $task_arn"
-            aws ec2 deregister-task-definition --task-definition "$task_arn" --region "$AWS_REGION" >/dev/null 2>&1 || true
+            aws ec2 deregister-task-definition --task-definition "$task_arn" --region "$AWS_REGION" --profile "$AWS_CLI_PROFILE" >/dev/null 2>&1 || true
         fi
     done
 
     log "Cleaning up ECR Repository ($ECR_REPO_NAME)..."
-    aws ecr delete-repository --repository-name "$ECR_REPO_NAME" --force --region "$AWS_REGION" >/dev/null 2>&1 || true
+    aws ecr delete-repository --repository-name "$ECR_REPO_NAME" --force --region "$AWS_REGION" --profile "$AWS_CLI_PROFILE" >/dev/null 2>&1 || true
 
-    EXISTING_BUCKET=$(aws s3api list-buckets --query "Buckets[?starts_with(Name, 'jenkins-sonarqube-binaries-')].Name" --output text 2>/dev/null || true)
+    EXISTING_BUCKET=$(aws s3api list-buckets --profile "$AWS_CLI_PROFILE" --query "Buckets[?starts_with(Name, 'jenkins-sonarqube-binaries-')].Name" --output text 2>/dev/null || true)
     if [ -n "$EXISTING_BUCKET" ] && [ "$EXISTING_BUCKET" != "None" ]; then
         read -p "Do you want to delete '$EXISTING_BUCKET' and its content? (y/N): " -n 1 -r
         echo
         if [[ $REPLY =~ ^[Yy]$ ]]; then
             log "Deleting bucket and content: $EXISTING_BUCKET"
-            aws s3 rm "s3://$EXISTING_BUCKET" --recursive >/dev/null || true
-            aws s3api delete-bucket --bucket "$EXISTING_BUCKET" --region "$AWS_REGION" >/dev/null || true
+            aws s3 rm "s3://$EXISTING_BUCKET" --recursive --profile "$AWS_CLI_PROFILE" >/dev/null || true
+            aws s3api delete-bucket --bucket "$EXISTING_BUCKET" --region "$AWS_REGION" --profile "$AWS_CLI_PROFILE" >/dev/null || true
         else
             log "Retaining bucket and content: $EXISTING_BUCKET"
         fi
     fi
 
     log "Deleting Security Group..."
-    SG_ID=$(aws ec2 describe-security-groups --group-names "$SECURITY_GROUP_NAME" --region "$AWS_REGION" --query 'SecurityGroups[0].GroupId' --output text 2>/dev/null || true)
+    SG_ID=$(aws ec2 describe-security-groups --group-names "$SECURITY_GROUP_NAME" --region "$AWS_REGION" --profile "$AWS_CLI_PROFILE" --query 'SecurityGroups[0].GroupId' --output text 2>/dev/null || true)
     if [ -n "$SG_ID" ] && [ "$SG_ID" != "None" ]; then
         log "Waiting for dependent ENIs to release..."
         for i in {1..12}; do
-            if aws ec2 delete-security-group --group-id "$SG_ID" --region "$AWS_REGION" >/dev/null 2>&1; then
+            if aws ec2 delete-security-group --group-id "$SG_ID" --region "$AWS_REGION" --profile "$AWS_CLI_PROFILE" >/dev/null 2>&1; then
                 log "Security Group successfully deleted."
                 break
             fi
@@ -522,38 +565,38 @@ teardown() {
     fi
 
     log "Cleaning up IAM Profile and Role..."
-    if aws iam get-instance-profile --instance-profile-name "$PROFILE_NAME" >/dev/null 2>&1; then
-        aws iam remove-role-from-instance-profile --instance-profile-name "$PROFILE_NAME" --role-name "$ROLE_NAME" >/dev/null || true
-        aws iam delete-instance-profile --instance-profile-name "$PROFILE_NAME" >/dev/null || true
+    if aws iam get-instance-profile --instance-profile-name "$PROFILE_NAME" --profile "$AWS_CLI_PROFILE" >/dev/null 2>&1; then
+        aws iam remove-role-from-instance-profile --instance-profile-name "$PROFILE_NAME" --role-name "$ROLE_NAME" --profile "$AWS_CLI_PROFILE" >/dev/null || true
+        aws iam delete-instance-profile --instance-profile-name "$PROFILE_NAME" --profile "$AWS_CLI_PROFILE" >/dev/null || true
     fi
 
-    if aws iam get-role --role-name "$ROLE_NAME" >/dev/null 2>&1; then
-        ATTACHED_POLICIES=$(aws iam list-attached-role-policies --role-name "$ROLE_NAME" --query 'AttachedPolicies[*].PolicyArn' --output text 2>/dev/null || true)
+    if aws iam get-role --role-name "$ROLE_NAME" --profile "$AWS_CLI_PROFILE" >/dev/null 2>&1; then
+        ATTACHED_POLICIES=$(aws iam list-attached-role-policies --role-name "$ROLE_NAME" --profile "$AWS_CLI_PROFILE" --query 'AttachedPolicies[*].PolicyArn' --output text 2>/dev/null || true)
         for policy_arn in $ATTACHED_POLICIES; do
-            aws iam detach-role-policy --role-name "$ROLE_NAME" --policy-arn "$policy_arn" >/dev/null || true
+            aws iam detach-role-policy --role-name "$ROLE_NAME" --policy-arn "$policy_arn" --profile "$AWS_CLI_PROFILE" >/dev/null || true
         done
 
-        INLINE_POLICIES=$(aws iam list-role-policies --role-name "$ROLE_NAME" --query 'PolicyNames[*]' --output text 2>/dev/null || true)
+        INLINE_POLICIES=$(aws iam list-role-policies --role-name "$ROLE_NAME" --profile "$AWS_CLI_PROFILE" --query 'PolicyNames[*]' --output text 2>/dev/null || true)
         for policy_name in $INLINE_POLICIES; do
-            aws iam delete-role-policy --role-name "$ROLE_NAME" --policy-name "$policy_name" >/dev/null || true
+            aws iam delete-role-policy --role-name "$ROLE_NAME" --policy-name "$policy_name" --profile "$AWS_CLI_PROFILE" >/dev/null || true
         done
 
-        aws iam delete-role --role-name "$ROLE_NAME" >/dev/null || true
+        aws iam delete-role --role-name "$ROLE_NAME" --profile "$AWS_CLI_PROFILE" >/dev/null || true
     fi
 
     log "Cleaning up IAM User 'jenkins'..."
-    if aws iam get-user --user-name jenkins >/dev/null 2>&1; then
-        KEYS=$(aws iam list-access-keys --user-name jenkins --query 'AccessKeyMetadata[*].AccessKeyId' --output text 2>/dev/null || true)
+    if aws iam get-user --user-name jenkins --profile "$AWS_CLI_PROFILE" >/dev/null 2>&1; then
+        KEYS=$(aws iam list-access-keys --user-name jenkins --profile "$AWS_CLI_PROFILE" --query 'AccessKeyMetadata[*].AccessKeyId' --output text 2>/dev/null || true)
         for kid in $KEYS; do
-            aws iam delete-access-key --user-name jenkins --access-key-id "$kid" >/dev/null 2>&1 || true
+            aws iam delete-access-key --user-name jenkins --access-key-id "$kid" --profile "$AWS_CLI_PROFILE" >/dev/null 2>&1 || true
         done
 
-        ATTACHED_USER_POLICIES=$(aws iam list-attached-user-policies --user-name jenkins --query 'AttachedPolicies[*].PolicyArn' --output text 2>/dev/null || true)
+        ATTACHED_USER_POLICIES=$(aws iam list-attached-user-policies --user-name jenkins --profile "$AWS_CLI_PROFILE" --query 'AttachedPolicies[*].PolicyArn' --output text 2>/dev/null || true)
         for policy_arn in $ATTACHED_USER_POLICIES; do
-            aws iam detach-user-policy --user-name jenkins --policy-arn "$policy_arn" >/dev/null || true
+            aws iam detach-user-policy --user-name jenkins --policy-arn "$policy_arn" --profile "$AWS_CLI_PROFILE" >/dev/null || true
         done
 
-        aws iam delete-user --user-name jenkins >/dev/null || true
+        aws iam delete-user --user-name jenkins --profile "$AWS_CLI_PROFILE" >/dev/null || true
     fi
 
     log "Teardown complete!"
