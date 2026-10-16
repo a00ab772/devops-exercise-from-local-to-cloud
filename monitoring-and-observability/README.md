@@ -144,11 +144,13 @@ This layer focuses in threat detection and compliance, for Example: "Detect logi
   * Splunk Security,
   * Wazuh.
 
-# Monitoring and Observability environment setup
+# Monitoring and Observability environment architecture
 
 The components that we will spin this lab are pretty much the same as you did in [../docker/README.md](../docker/README.md), but in addition we will spin up a Prometheus + Grafana EC2 instance, this is the architectural diagram:
 
 ![jenkins_cicd_in_docker_monitoring_and_observability.drawio.png](images/jenkins_cicd_in_docker_monitoring_and_observability.drawio.png)
+
+# Monitoring and Observability environment setup
 
  You can spin it up using the provided [scripts/docker_jenkins_cicd_monitoring_setup.sh](scripts/docker_jenkins_cicd_monitoring_setup.sh) script:
 
