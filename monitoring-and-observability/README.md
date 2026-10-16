@@ -216,7 +216,7 @@ Let's access the Prometheus public IP (port 9090):
 
 ![prometheus_9090](images/prometheus_9090.png)
 
-We can use the PromQL for common metrics:
+We can use the [PromQL](https://promlabs.com/promql-cheat-sheet/) for common metrics:
 
 * up
 * {__name__=~".+"}
