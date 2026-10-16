@@ -34,10 +34,12 @@ verify_aws_auth() {
 }
 
 usage() {
-    echo "Usage: $0 {provision|teardown|update-ip}"
+    echo "Usage: $0 {provision [jenkins|sonarqube|prometheus]|teardown|update-ip}"
     echo
     echo "Options:"
-    echo "  provision  : Deploys IAM roles, S3 bucket, Security Group, EC2 instances, IAM user, ECR, and ECS resources."
+    echo "  provision  : Deploys IAM roles, S3 bucket, Security Group, ECR, and ECS resources."
+    echo "               You can specify individual servers to spin up: jenkins, sonarqube, prometheus."
+    echo "               If no server is specified, all of them will be provisioned."
     echo "  teardown   : Terminates EC2 instances, cleans up AWS resources including IAM user, ECR, and ECS resources."
     echo "  update-ip  : Fetches your local machine's current public IP via curl,"
     echo "               clears out stale ingress rules in the Security Group, and"
@@ -444,6 +446,7 @@ EOF
 }
 
 provision() {
+    local TARGET_SERVER="${1:-all}"
     verify_aws_auth
     SG_ID=$(create_security_group)
     setup_iam_profile
@@ -452,56 +455,64 @@ provision() {
     setup_ecs_resources
     upload_binary_to_s3
 
-    generate_user_data_jenkins
-    generate_user_data_sonarqube
-    generate_user_data_prometheus_grafana
-
     log "Fetching latest Ubuntu ARM64 AMI..."
     AMI_ID=$(aws ec2 describe-images --region "$AWS_REGION" --profile "$AWS_CLI_PROFILE" --owners 099720109477 --filters "Name=name,Values=ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-arm64-server-*" "Name=state,Values=available" --query "sort_by(Images, &CreationDate)[-1].ImageId" --output text)
 
     log "Waiting 10 seconds for IAM profile propagation..."
     sleep 10
 
-    log "Launching Instance 1: Jenkins Server ($INSTANCE_TYPE_HEAVY)..."
-    ID_JENKINS=$(aws ec2 run-instances \
-        --image-id "$AMI_ID" \
-        --count 1 \
-        --instance-type "$INSTANCE_TYPE_HEAVY" \
-        --security-group-ids "$SG_ID" \
-        --iam-instance-profile "Name=$PROFILE_NAME" \
-        --user-data file://user-data-jenkins.sh \
-        --block-device-mappings '[{"DeviceName":"/dev/sda1","Ebs":{"VolumeSize":20,"VolumeType":"gp3"}}]' \
-        --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=$TAG_NAME_JENKINS}]" \
-        --query 'Instances[0].InstanceId' --output text --region "$AWS_REGION" --profile "$AWS_CLI_PROFILE")
+    # Provision Jenkins Server
+    if [ "$TARGET_SERVER" == "all" ] || [ "$TARGET_SERVER" == "jenkins" ]; then
+        generate_user_data_jenkins
+        log "Launching Instance: Jenkins Server ($INSTANCE_TYPE_HEAVY)..."
+        ID_JENKINS=$(aws ec2 run-instances \
+            --image-id "$AMI_ID" \
+            --count 1 \
+            --instance-type "$INSTANCE_TYPE_HEAVY" \
+            --security-group-ids "$SG_ID" \
+            --iam-instance-profile "Name=$PROFILE_NAME" \
+            --user-data file://user-data-jenkins.sh \
+            --block-device-mappings '[{"DeviceName":"/dev/sda1","Ebs":{"VolumeSize":20,"VolumeType":"gp3"}}]' \
+            --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=$TAG_NAME_JENKINS}]" \
+            --query 'Instances[0].InstanceId' --output text --region "$AWS_REGION" --profile "$AWS_CLI_PROFILE")
+        log "Jenkins Instance ID: $ID_JENKINS"
+    fi
 
-    log "Launching Instance 2: SonarQube Server ($INSTANCE_TYPE_HEAVY)..."
-    ID_SQ=$(aws ec2 run-instances \
-        --image-id "$AMI_ID" \
-        --count 1 \
-        --instance-type "$INSTANCE_TYPE_HEAVY" \
-        --security-group-ids "$SG_ID" \
-        --iam-instance-profile "Name=$PROFILE_NAME" \
-        --user-data file://user-data-sonarqube.sh \
-        --block-device-mappings '[{"DeviceName":"/dev/sda1","Ebs":{"VolumeSize":20,"VolumeType":"gp3"}}]' \
-        --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=$TAG_NAME_SONARQUBE}]" \
-        --query 'Instances[0].InstanceId' --output text --region "$AWS_REGION" --profile "$AWS_CLI_PROFILE")
+    # Provision SonarQube Server
+    if [ "$TARGET_SERVER" == "all" ] || [ "$TARGET_SERVER" == "sonarqube" ]; then
+        generate_user_data_sonarqube
+        log "Launching Instance: SonarQube Server ($INSTANCE_TYPE_HEAVY)..."
+        ID_SQ=$(aws ec2 run-instances \
+            --image-id "$AMI_ID" \
+            --count 1 \
+            --instance-type "$INSTANCE_TYPE_HEAVY" \
+            --security-group-ids "$SG_ID" \
+            --iam-instance-profile "Name=$PROFILE_NAME" \
+            --user-data file://user-data-sonarqube.sh \
+            --block-device-mappings '[{"DeviceName":"/dev/sda1","Ebs":{"VolumeSize":20,"VolumeType":"gp3"}}]' \
+            --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=$TAG_NAME_SONARQUBE}]" \
+            --query 'Instances[0].InstanceId' --output text --region "$AWS_REGION" --profile "$AWS_CLI_PROFILE")
+        log "SonarQube Instance ID: $ID_SQ"
+    fi
 
-    log "Launching Instance 3: Prometheus & Grafana Server ($INSTANCE_TYPE_LIGHT)..."
-    ID_PROM_GRAFANA=$(aws ec2 run-instances \
-        --image-id "$AMI_ID" \
-        --count 1 \
-        --instance-type "$INSTANCE_TYPE_LIGHT" \
-        --security-group-ids "$SG_ID" \
-        --iam-instance-profile "Name=$PROFILE_NAME" \
-        --user-data file://user-data-prometheus-grafana.sh \
-        --block-device-mappings '[{"DeviceName":"/dev/sda1","Ebs":{"VolumeSize":20,"VolumeType":"gp3"}}]' \
-        --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=$TAG_NAME_PROM_GRAFANA}]" \
-        --query 'Instances[0].InstanceId' --output text --region "$AWS_REGION" --profile "$AWS_CLI_PROFILE")
+    # Provision Prometheus & Grafana Server
+    if [ "$TARGET_SERVER" == "all" ] || [ "$TARGET_SERVER" == "prometheus" ]; then
+        generate_user_data_prometheus_grafana
+        log "Launching Instance: Prometheus & Grafana Server ($INSTANCE_TYPE_LIGHT)..."
+        ID_PROM_GRAFANA=$(aws ec2 run-instances \
+            --image-id "$AMI_ID" \
+            --count 1 \
+            --instance-type "$INSTANCE_TYPE_LIGHT" \
+            --security-group-ids "$SG_ID" \
+            --iam-instance-profile "Name=$PROFILE_NAME" \
+            --user-data file://user-data-prometheus-grafana.sh \
+            --block-device-mappings '[{"DeviceName":"/dev/sda1","Ebs":{"VolumeSize":20,"VolumeType":"gp3"}}]' \
+            --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=$TAG_NAME_PROM_GRAFANA}]" \
+            --query 'Instances[0].InstanceId' --output text --region "$AWS_REGION" --profile "$AWS_CLI_PROFILE")
+        log "Prometheus & Grafana Instance ID: $ID_PROM_GRAFANA"
+    fi
 
-    log "Successfully provisioned all instances, ECR, and ECS resources!"
-    log "Jenkins Instance ID: $ID_JENKINS"
-    log "SonarQube Instance ID: $ID_SQ"
-    log "Prometheus & Grafana Instance ID: $ID_PROM_GRAFANA"
+    log "Successfully provisioned requested resources!"
 }
 
 teardown() {
@@ -604,7 +615,7 @@ teardown() {
 
 case "${1:-}" in
     provision)
-        provision
+        provision "${2:-all}"
         ;;
     teardown)
         teardown

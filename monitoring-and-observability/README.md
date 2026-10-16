@@ -153,22 +153,23 @@ The components that we will spin this lab are pretty much the same as you did in
  You can spin it up using the provided [scripts/docker_jenkins_cicd_monitoring_setup.sh](scripts/docker_jenkins_cicd_monitoring_setup.sh) script:
 
 ```bash
-
 user@DESKTOP-SCNMK3I UCRT64 ~/Documents/devops-exercise-from-local-to-cloud/monitoring-and-observability/scripts (main)
 Thu Oct 15 15:56:15
 $ ./docker_jenkins_cicd_monitoring_setup.sh
-Usage: ./docker_jenkins_cicd_monitoring_setup.sh {provision|teardown|update-ip}
+Usage: ./docker_jenkins_cicd_monitoring_setup.sh {provision [jenkins|sonarqube|prometheus]|teardown|update-ip}
 
 Options:
-  provision  : Deploys IAM roles, S3 bucket, Security Group, EC2 instances, IAM user, ECR, and ECS resources.
+  provision  : Deploys IAM roles, S3 bucket, Security Group, ECR, and ECS resources.
+               You can specify individual servers to spin up: jenkins, sonarqube, prometheus.
+               If no server is specified, all of them will be provisioned.
   teardown   : Terminates EC2 instances, cleans up AWS resources including IAM user, ECR, and ECS resources.
   update-ip  : Fetches your local machine's current public IP via curl,
                clears out stale ingress rules in the Security Group, and
                authorizes the new IP (ports 22, 3000, 8080, 9000, 9090) plus
                self-referencing traffic between instances.
+```
 
-
-
+```bash
 user@DESKTOP-SCNMK3I UCRT64 ~/Documents/devops-exercise-from-local-to-cloud/monitoring-and-observability/scripts (main)
 Thu Oct 15 15:57:54
 $ ./docker_jenkins_cicd_monitoring_setup.sh provision

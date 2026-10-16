@@ -75,9 +75,12 @@ And then log in from command line:
 
 ```powershell
 aws login
+
+aws sts get-caller-identity
 ```
 
 ![aws_login](images/aws_login.png)
+
 
 ## 1.1. Automation scripts
 
