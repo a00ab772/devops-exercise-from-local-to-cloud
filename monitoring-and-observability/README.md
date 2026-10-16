@@ -216,6 +216,20 @@ Let's access the Prometheus public IP (port 9090):
 
 ![prometheus_9090](images/prometheus_9090.png)
 
+We can use the PromQL for common metrics:
+
+* up
+* {__name__=~".+"}
+* scrape_samples_scraped
+* scrape_duration_seconds
+* prometheus_http_requests_total
+* process_cpu_seconds_total
+* process_resident_memory_bytes
+* ...
+
+![prometheus_9090_01](images/prometheus_9090_01.png)
+
+
 Let's access the Grafana public IP, default username and password is `admin`:
 
 ![grafana_3000](images/grafana_3000.png)

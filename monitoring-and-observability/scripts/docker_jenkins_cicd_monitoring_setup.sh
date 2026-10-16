@@ -34,13 +34,13 @@ verify_aws_auth() {
 }
 
 usage() {
-    echo "Usage: $0 {provision [jenkins|sonarqube|prometheus]|teardown|update-ip}"
+    echo "Usage: $0 {provision [jenkins|sonarqube|prometheus]|teardown [jenkins|sonarqube|prometheus]|update-ip}"
     echo
     echo "Options:"
     echo "  provision  : Deploys IAM roles, S3 bucket, Security Group, ECR, and ECS resources."
     echo "               You can specify individual servers to spin up: jenkins, sonarqube, prometheus."
-    echo "               If no server is specified, all of them will be provisioned."
-    echo "  teardown   : Terminates EC2 instances, cleans up AWS resources including IAM user, ECR, and ECS resources."
+    echo "  teardown   : Terminates EC2 instances and cleans up resources."
+    echo "               You can specify an individual server to teardown: jenkins, sonarqube, prometheus."
     echo "  update-ip  : Fetches your local machine's current public IP via curl,"
     echo "               clears out stale ingress rules in the Security Group, and"
     echo "               authorizes the new IP (ports 22, 3000, 8080, 9000, 9090) plus"
@@ -381,6 +381,7 @@ apt-get install -y unzip curl net-tools groff apt-transport-https software-prope
 log "Installing Prometheus..."
 useradd --no-create-home --shell /bin/false prometheus || true
 mkdir -p /etc/prometheus /var/lib/prometheus
+chown -R prometheus:prometheus /var/lib/prometheus
 
 PROM_VERSION="2.51.0"
 curl -sLO "https://github.com/prometheus/prometheus/releases/download/v${PROM_VERSION}/prometheus-${PROM_VERSION}.linux-arm64.tar.gz"
@@ -399,6 +400,9 @@ global:
   scrape_interval: 15s
 scrape_configs:
   - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+  - job_name: 'node-exporter-or-services'
     static_configs:
       - targets: ['localhost:9090']
 EOT
@@ -427,12 +431,190 @@ EOT
 systemctl daemon-reload
 systemctl enable --now prometheus
 
+log "Installing Loki..."
+LOKI_VERSION="2.9.4"
+useradd --no-create-home --shell /bin/false loki || true
+curl -sLO "https://github.com/grafana/loki/releases/download/v${LOKI_VERSION}/loki-linux-arm64.zip"
+unzip loki-linux-arm64.zip
+mv loki-linux-arm64 /usr/local/bin/loki
+chown loki:loki /usr/local/bin/loki
+rm loki-linux-arm64.zip
+
+mkdir -p /etc/loki /var/lib/loki
+cat << 'EOT' > /etc/loki/loki-config.yaml
+auth_enabled: false
+server:
+  http_listen_port: 3100
+common:
+  path_prefix: /var/lib/loki
+  storage:
+    filesystem:
+      chunks_directory: /var/lib/loki/chunks
+      rules_directory: /var/lib/loki/rules
+  replication_factor: 1
+  ring:
+    instance_addr: 127.0.0.1
+    kvstore:
+      store: inmemory
+schema_config:
+  configs:
+    - from: 2020-10-24
+      store: boltdb-shipper
+      object_store: filesystem
+      schema: v11
+      index:
+        prefix: index_
+        period: 24h
+EOT
+chown -R loki:loki /etc/loki /var/lib/loki
+
+cat << 'EOT' > /etc/systemd/system/loki.service
+[Unit]
+Description=Loki Service
+After=network.target
+
+[Service]
+User=loki
+Group=loki
+Type=simple
+ExecStart=/usr/local/bin/loki --config.file=/etc/loki/loki-config.yaml
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+EOT
+
+systemctl daemon-reload
+systemctl enable --now loki
+
+log "Installing Promtail (Log Shipper for Loki)..."
+PROMTAIL_VERSION="2.9.4"
+curl -sLO "https://github.com/grafana/loki/releases/download/v${PROMTAIL_VERSION}/promtail-linux-arm64.zip"
+unzip promtail-linux-arm64.zip
+mv promtail-linux-arm64 /usr/local/bin/promtail
+chmod +x /usr/local/bin/promtail
+rm promtail-linux-arm64.zip
+
+mkdir -p /etc/promtail
+cat << 'EOT' > /etc/promtail/promtail-config.yaml
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://localhost:3100/loki/api/v1/push
+
+scrape_configs:
+  - job_name: system
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: varlogs
+          __path__: /var/log/*log
+EOT
+
+cat << 'EOT' > /etc/systemd/system/promtail.service
+[Unit]
+Description=Promtail Service
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/promtail --config.file=/etc/promtail/promtail-config.yaml
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+EOT
+
+systemctl daemon-reload
+systemctl enable --now promtail
+
 log "Installing Grafana..."
 mkdir -p /etc/apt/keyrings
 wget -q -O /etc/apt/keyrings/grafana.key https://apt.grafana.com/gpg.key
 echo "deb [signed-by=/etc/apt/keyrings/grafana.key] https://apt.grafana.com stable main" | tee /etc/apt/sources.list.d/grafana.list
 apt-get update -y
 apt-get install -y grafana
+
+log "Configuring Grafana Datasources (Prometheus & Loki)..."
+mkdir -p /etc/grafana/provisioning/datasources
+cat << 'EOT' > /etc/grafana/provisioning/datasources/datasources.yaml
+apiVersion: 1
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://localhost:9090
+    isDefault: true
+  - name: Loki
+    type: loki
+    access: proxy
+    url: http://localhost:3100
+EOT
+
+log "Configuring default AWS / Infrastructure Dashboard..."
+mkdir -p /etc/grafana/provisioning/dashboards
+cat << 'EOT' > /etc/grafana/provisioning/dashboards/dashboards.yaml
+apiVersion: 1
+providers:
+  - name: 'Default'
+    orgId: 1
+    folder: ''
+    type: file
+    disableDeletion: false
+    editable: true
+    options:
+      path: /etc/grafana/provisioning/dashboards
+EOT
+
+mkdir -p /etc/grafana/provisioning/dashboards/json
+cat << 'EOT' > /etc/grafana/provisioning/dashboards/json/aws_infra.json
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "grafanaVersion": "10.0.0",
+  "hideControls": false,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "name": "AWS Infrastructure & Monitoring Dashboard",
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "id": 1,
+      "title": "Prometheus Up Status",
+      "type": "stat",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "editorMode": "code",
+          "expr": "up",
+          "legendFormat": "{{job}}",
+          "range": true,
+          "refId": "A"
+        }
+      ]
+    }
+  ],
+  "refresh": "10s",
+  "schemaVersion": 38,
+  "style": "dark",
+  "tags": ["aws", "devops"],
+  "time": { "from": "now-1h", "to": "now" },
+  "timepicker": {},
+  "timezone": "",
+  "title": "AWS Infrastructure & Monitoring Dashboard",
+  "version": 1
+}
+EOT
+
 systemctl daemon-reload
 systemctl enable --now grafana-server
 
@@ -441,7 +623,7 @@ INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
 REGION=$(curl -s http://169.254.169.254/latest/meta-data/placement/region)
 echo "0 0 * * * root aws ec2 stop-instances --instance-ids $INSTANCE_ID --region $REGION" > /etc/cron.d/daily-shutdown
 chmod 644 /etc/cron.d/daily-shutdown
-log "Prometheus and Grafana provisioning complete!"
+log "Prometheus, Loki, Promtail and Grafana provisioning complete!"
 EOF
 }
 
@@ -450,10 +632,14 @@ provision() {
     verify_aws_auth
     SG_ID=$(create_security_group)
     setup_iam_profile
-    create_jenkins_iam_user
-    setup_ecr_repository
-    setup_ecs_resources
-    upload_binary_to_s3
+
+    # Solo configuramos recursos globales si se provisiona todo o explícitamente jenkins
+    if [ "$TARGET_SERVER" == "all" ] || [ "$TARGET_SERVER" == "jenkins" ]; then
+        create_jenkins_iam_user
+        setup_ecr_repository
+        setup_ecs_resources
+        upload_binary_to_s3
+    fi
 
     log "Fetching latest Ubuntu ARM64 AMI..."
     AMI_ID=$(aws ec2 describe-images --region "$AWS_REGION" --profile "$AWS_CLI_PROFILE" --owners 099720109477 --filters "Name=name,Values=ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-arm64-server-*" "Name=state,Values=available" --query "sort_by(Images, &CreationDate)[-1].ImageId" --output text)
@@ -516,8 +702,36 @@ provision() {
 }
 
 teardown() {
+    local TARGET_SERVER="${1:-all}"
     verify_aws_auth
-    log "Locating and terminating instances..."
+
+    # Teardown individual EC2 instance if requested
+    if [ "$TARGET_SERVER" != "all" ]; then
+        local TAG_TO_KILL=""
+        case "$TARGET_SERVER" in
+            jenkins) TAG_TO_KILL="$TAG_NAME_JENKINS" ;;
+            sonarqube) TAG_TO_KILL="$TAG_NAME_SONARQUBE" ;;
+            prometheus) TAG_TO_KILL="$TAG_NAME_PROM_GRAFANA" ;;
+            *) log "Unknown server target: $TARGET_SERVER"; exit 1 ;;
+        esac
+
+        log "Locating instance with tag $TAG_TO_KILL..."
+        INSTANCE_ID=$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=$TAG_TO_KILL" "Name=instance-state-name,Values=pending,running,stopped,stopping" \
+            --query "Reservations[*].Instances[*].InstanceId" --output text --region "$AWS_REGION" --profile "$AWS_CLI_PROFILE" 2>/dev/null || true)
+
+        if [ -n "$INSTANCE_ID" ] && [ "$INSTANCE_ID" != "None" ]; then
+            log "Terminating instance $INSTANCE_ID ($TAG_TO_KILL)..."
+            aws ec2 terminate-instances --instance-ids "$INSTANCE_ID" --region "$AWS_REGION" --profile "$AWS_CLI_PROFILE" >/dev/null
+            log "Instance $INSTANCE_ID successfully terminated."
+        else
+            log "No running instance found for $TAG_TO_KILL."
+        fi
+        return 0
+    fi
+
+    # Full Teardown
+    log "Locating and terminating all instances..."
     for TAG in "$TAG_NAME_JENKINS" "$TAG_NAME_SONARQUBE" "$TAG_NAME_PROM_GRAFANA"; do
         INSTANCE_ID=$(aws ec2 describe-instances \
             --filters "Name=tag:Name,Values=$TAG" "Name=instance-state-name,Values=pending,running,stopped,stopping" \
@@ -618,7 +832,7 @@ case "${1:-}" in
         provision "${2:-all}"
         ;;
     teardown)
-        teardown
+        teardown "${2:-all}"
         ;;
     update-ip)
         update_security_group_ip
