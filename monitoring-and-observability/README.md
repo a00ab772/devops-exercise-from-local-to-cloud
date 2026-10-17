@@ -219,6 +219,10 @@ The stress web application that we will monitor can be accessed from the stress 
 
 ![stress_test_app](images/stress_test_app.png)
 
+Send some payment traffic that will be pushed to prometheus via the alloy service:
+
+![stress_test_app_01](images/stress_test_app_01.png)
+
 Let's access the Prometheus public IP (port 9090):
 
 ![prometheus_9090](images/prometheus_9090.png)

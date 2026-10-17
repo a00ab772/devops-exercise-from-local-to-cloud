@@ -622,7 +622,6 @@ git clone https://github.com/hkhcoder/vprofile-project.git /tmp/project
 cd /tmp/project && git checkout monitoring
 mv titan/* /opt/titan/
 
-# FIXED: Change directory back to /opt/titan so venv is created in the correct path
 cd /opt/titan
 python3 -m venv venv
 source venv/bin/activate
@@ -653,6 +652,69 @@ TITANSERVICE
 
 systemctl daemon-reload
 systemctl enable --now titan
+
+log "Setting up load generation scripts..."
+apt-get install -y stress
+wget -q -P /usr/local/bin/ https://raw.githubusercontent.com/hkhcoder/vprofile-project/refs/heads/monitoring/load.sh
+wget -q -P /usr/local/bin/ https://raw.githubusercontent.com/hkhcoder/vprofile-project/refs/heads/monitoring/generate_multi_logs.sh
+chmod +x /usr/local/bin/load.sh /usr/local/bin/generate_multi_logs.sh
+nohup /usr/local/bin/load.sh > /dev/null 2>&1 &
+nohup /usr/local/bin/generate_multi_logs.sh > /dev/null 2>&1 &
+
+log "Installing and Configuring Grafana Alloy..."
+apt-get install -y gpg wget
+mkdir -p /etc/apt/keyrings/
+wget -q -O - https://apt.grafana.com/gpg.key | gpg --dearmor | tee /etc/apt/keyrings/grafana.gpg > /dev/null
+echo "deb [signed-by=/etc/apt/keyrings/grafana.gpg] https://apt.grafana.com stable main" | tee /etc/apt/sources.list.d/grafana.list
+apt-get update && apt-get install -y alloy
+
+cat <<ALLOYCONF > /etc/alloy/config.alloy
+prometheus.remote_write "default" {
+  endpoint {
+    url = "http://\$PROMETHEUS_IP:9090/api/v1/write"
+  }
+}
+
+prometheus.scrape "metrics_5000" {
+  targets = [{
+    __address__ = "localhost:5000",
+    __metrics_path__ = "/metrics",
+  }]
+  forward_to = [prometheus.remote_write.default.receiver]
+}
+
+prometheus.scrape "node_metrics" {
+  targets = [{
+    __address__ = "localhost:9100",
+    __metrics_path__ = "/metrics",
+  }]
+  forward_to = [prometheus.remote_write.default.receiver]
+}
+
+local.file_match "titan_logs" {
+  path_targets = [{
+    __path__ = "/var/log/titan/*.log",
+    job      = "titan",
+    hostname = constants.hostname,
+  }]
+  sync_period = "5s"
+}
+
+loki.source.file "log_scrape" {
+  targets       = local.file_match.titan_logs.targets
+  forward_to    = [loki.write.loki.receiver]
+  tail_from_end = true
+}
+
+loki.write "loki" {
+  endpoint {
+    url = "http://\$LOKI_IP:3100/loki/api/v1/push"
+  }
+}
+ALLOYCONF
+
+systemctl restart alloy
+systemctl enable alloy
 EOF
 }
 
