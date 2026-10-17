@@ -158,13 +158,14 @@ The components that we will spin this lab are pretty much the same as you did in
 user@DESKTOP-SCNMK3I UCRT64 ~/Documents/devops-exercise-from-local-to-cloud/monitoring-and-observability/scripts (main)
 Thu Oct 15 15:56:15
 $ ./docker_jenkins_cicd_monitoring_setup.sh
-Usage: ./docker_jenkins_cicd_monitoring_setup.sh {provision [jenkins|sonarqube|prometheus]|teardown|update-ip}
+Usage: ./docker_jenkins_cicd_monitoring_setup.sh {provision [jenkins|sonarqube|prometheus]|teardown [jenkins|sonarqube|prometheus]|update-ip}
 
 Options:
   provision  : Deploys IAM roles, S3 bucket, Security Group, ECR, and ECS resources.
                You can specify individual servers to spin up: jenkins, sonarqube, prometheus.
-               If no server is specified, all of them will be provisioned.
-  teardown   : Terminates EC2 instances, cleans up AWS resources including IAM user, ECR, and ECS resources.
+               Note: Provisioning 'prometheus' also spins up the stress micro instance forwarding metrics/logs.
+  teardown   : Terminates EC2 instances and cleans up resources.
+               You can specify an individual server to teardown: jenkins, sonarqube, prometheus.
   update-ip  : Fetches your local machine's current public IP via curl,
                clears out stale ingress rules in the Security Group, and
                authorizes the new IP (ports 22, 3000, 8080, 9000, 9090) plus
@@ -206,13 +207,17 @@ Secret Access Key:  rq4vi7***********Jdj8l8/H
 [2026-10-15 16:16:00] Launching Instance 1: Jenkins Server (t4g.small)...
 [2026-10-15 16:16:03] Launching Instance 2: SonarQube Server (t4g.small)...
 [2026-10-15 16:16:05] Launching Instance 3: Prometheus & Grafana Server (t4g.micro)...
+[2026-10-17 07:19:40] Launching Conditional Instance: Stress Micro Server (t4g.micro)...
+[2026-10-17 07:19:43] Stress Instance ID: i-0926*******8b82b
 [2026-10-15 16:16:08] Successfully provisioned all instances, ECR, and ECS resources!
 [2026-10-15 16:16:08] Jenkins Instance ID: i-09***********32c
 [2026-10-15 16:16:08] SonarQube Instance ID: i-0cb***********5a8
 [2026-10-15 16:16:08] Prometheus & Grafana Instance ID: i-0b01***********e39
 ```
 
-To complete the Jenkins and SonarQube configuration you can quickly follow the steps seen in [../docker/README.md](../docker/README.md)
+The stress web application that we will monitor can be accessed from the stress instance public ip on port 5000:
+
+![stress_test_app](images/stress_test_app.png)
 
 Let's access the Prometheus public IP (port 9090):
 
@@ -231,6 +236,9 @@ We can use the [PromQL](https://promlabs.com/promql-cheat-sheet/) for common met
 
 ![prometheus_9090_01](images/prometheus_9090_01.png)
 
+You can see all the metrics collected by Prometheus via the /metrics end point:
+
+![prometheus_9090_02](images/prometheus_9090_02.png)
 
 Let's access the Grafana public IP, default username and password is `admin`:
 

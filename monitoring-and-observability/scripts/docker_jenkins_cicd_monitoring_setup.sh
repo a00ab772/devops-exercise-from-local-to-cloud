@@ -12,6 +12,7 @@ readonly PROFILE_NAME="EC2ShutdownProfile"
 readonly TAG_NAME_JENKINS="Jenkins-Server"
 readonly TAG_NAME_SONARQUBE="SonarQube-Server"
 readonly TAG_NAME_PROM_GRAFANA="Prometheus-Grafana-Server"
+readonly TAG_NAME_STRESS="Stress-Micro-Server"
 readonly S3_BUCKET_NAME="jenkins-sonarqube-binaries-${RANDOM}"
 readonly ECS_CLUSTER_NAME="devops-exercise-from-local-to-cloud"
 readonly ECS_SERVICE_NAME="devops-exercise-from-local-to-cloud-service"
@@ -39,11 +40,12 @@ usage() {
     echo "Options:"
     echo "  provision  : Deploys IAM roles, S3 bucket, Security Group, ECR, and ECS resources."
     echo "               You can specify individual servers to spin up: jenkins, sonarqube, prometheus."
+    echo "               Note: Provisioning 'prometheus' also spins up the stress micro instance forwarding metrics/logs."
     echo "  teardown   : Terminates EC2 instances and cleans up resources."
     echo "               You can specify an individual server to teardown: jenkins, sonarqube, prometheus."
     echo "  update-ip  : Fetches your local machine's current public IP via curl,"
     echo "               clears out stale ingress rules in the Security Group, and"
-    echo "               authorizes the new IP (ports 22, 3000, 8080, 9000, 9090) plus"
+    echo "               authorizes the new IP (ports 22, 3000, 3100, 5000, 8080, 9000, 9090) plus"
     echo "               self-referencing traffic between instances."
     exit 1
 }
@@ -74,13 +76,13 @@ update_security_group_ip() {
         aws ec2 revoke-security-group-ingress --group-id "$SG_ID" --ip-permissions "$EXISTING_RULES" --region "$AWS_REGION" --profile "$AWS_CLI_PROFILE" >/dev/null || true
     fi
 
-    log "Authorizing inbound access for your IP ($MY_IP_CIDR) on ports 22, 3000, 8080, 9000, 9090..."
-    for port in 22 3000 8080 9000 9090; do
+    log "Authorizing inbound access for your IP ($MY_IP_CIDR) on ports 22, 3000 3100 5000 8080 9000 9100 9090..."
+    for port in 22 3000 3100 5000 8080 9000 9100 9090; do
         aws ec2 authorize-security-group-ingress --group-id "$SG_ID" --protocol tcp --port "$port" --cidr "$MY_IP_CIDR" --region "$AWS_REGION" --profile "$AWS_CLI_PROFILE" >/dev/null
     done
 
-    log "Authorizing self-referencing internal traffic for ports 3000, 8080, 9000, 9090..."
-    for port in 3000 8080 9000 9090; do
+    log "Authorizing self-referencing internal traffic for ports 3000 3100 5000 8080 9000 9100 9090..."
+    for port in 3000 3100 5000 8080 9000 9100 9090; do
         aws ec2 authorize-security-group-ingress --group-id "$SG_ID" --protocol tcp --port "$port" --source-group "$SG_ID" --region "$AWS_REGION" --profile "$AWS_CLI_PROFILE" >/dev/null
     done
 
@@ -91,7 +93,7 @@ create_security_group() {
     log "Checking/Creating Security Group..."
     if ! SG_ID=$(aws ec2 describe-security-groups --group-names "$SECURITY_GROUP_NAME" --region "$AWS_REGION" --profile "$AWS_CLI_PROFILE" --query 'SecurityGroups[0].GroupId' --output text 2>/dev/null); then
         SG_ID=$(aws ec2 create-security-group --group-name "$SECURITY_GROUP_NAME" \
-            --description "SG for Jenkins, SonarQube, and Prometheus/Grafana Instances" \
+            --description "SG for Jenkins, SonarQube, Prometheus/Grafana, and Stress Instances" \
             --query 'GroupId' --output text --region "$AWS_REGION" --profile "$AWS_CLI_PROFILE")
     fi
 
@@ -376,7 +378,7 @@ echo '/swapfile none swap sw 0 0' >> /etc/fstab
 
 log "Updating system packages and installing prerequisites..."
 apt-get update -y && apt-get upgrade -y
-apt-get install -y unzip curl net-tools groff apt-transport-https software-properties-common wget
+apt-get install -y unzip curl net-tools groff apt-transport-https software-properties-common wget gpg
 
 log "Installing Prometheus..."
 useradd --no-create-home --shell /bin/false prometheus || true
@@ -400,9 +402,6 @@ global:
   scrape_interval: 15s
 scrape_configs:
   - job_name: 'prometheus'
-    static_configs:
-      - targets: ['localhost:9090']
-  - job_name: 'node-exporter-or-services'
     static_configs:
       - targets: ['localhost:9090']
 EOT
@@ -487,59 +486,37 @@ EOT
 systemctl daemon-reload
 systemctl enable --now loki
 
-log "Installing Promtail (Log Shipper for Loki)..."
-PROMTAIL_VERSION="2.9.4"
-curl -sLO "https://github.com/grafana/loki/releases/download/v${PROMTAIL_VERSION}/promtail-linux-arm64.zip"
-unzip promtail-linux-arm64.zip
-mv promtail-linux-arm64 /usr/local/bin/promtail
-chmod +x /usr/local/bin/promtail
-rm promtail-linux-arm64.zip
-
-mkdir -p /etc/promtail
-cat << 'EOT' > /etc/promtail/promtail-config.yaml
-server:
-  http_listen_port: 9080
-  grpc_listen_port: 0
-
-positions:
-  filename: /tmp/positions.yaml
-
-clients:
-  - url: http://localhost:3100/loki/api/v1/push
-
-scrape_configs:
-  - job_name: system
-    static_configs:
-      - targets:
-          - localhost
-        labels:
-          job: varlogs
-          __path__: /var/log/*log
-EOT
-
-cat << 'EOT' > /etc/systemd/system/promtail.service
-[Unit]
-Description=Promtail Service
-After=network.target
-
-[Service]
-Type=simple
-ExecStart=/usr/local/bin/promtail --config.file=/etc/promtail/promtail-config.yaml
-Restart=always
-
-[Install]
-WantedBy=multi-user.target
-EOT
-
-systemctl daemon-reload
-systemctl enable --now promtail
-
-log "Installing Grafana..."
+log "Adding Grafana Repository and installing Grafana + Grafana Alloy..."
 mkdir -p /etc/apt/keyrings
 wget -q -O /etc/apt/keyrings/grafana.key https://apt.grafana.com/gpg.key
 echo "deb [signed-by=/etc/apt/keyrings/grafana.key] https://apt.grafana.com stable main" | tee /etc/apt/sources.list.d/grafana.list
 apt-get update -y
-apt-get install -y grafana
+apt-get install -y grafana alloy
+
+log "Configuring Grafana Alloy pipeline to collect logs and forward to Loki..."
+cat << 'EOT' > /etc/alloy/config.alloy
+local.file_match "local_files" {
+  path_targets = [
+    { "__path__" = "/var/log/*.log" },
+  ]
+  sync_period = "5s"
+}
+
+loki.source.file "log_scrape" {
+  targets       = local.file_match.local_files.targets
+  forward_to    = [loki.write.grafana_loki.receiver]
+  tail_from_end = true
+}
+
+loki.write "grafana_loki" {
+  endpoint {
+    url = "http://localhost:3100/loki/api/v1/push"
+  }
+}
+EOT
+
+systemctl daemon-reload
+systemctl enable --now alloy
 
 log "Configuring Grafana Datasources (Prometheus & Loki)..."
 mkdir -p /etc/grafana/provisioning/datasources
@@ -557,7 +534,7 @@ datasources:
     url: http://localhost:3100
 EOT
 
-log "Configuring default AWS / Infrastructure Dashboard..."
+log "Configuring default Infrastructure Dashboard..."
 mkdir -p /etc/grafana/provisioning/dashboards
 cat << 'EOT' > /etc/grafana/provisioning/dashboards/dashboards.yaml
 apiVersion: 1
@@ -577,12 +554,7 @@ cat << 'EOT' > /etc/grafana/provisioning/dashboards/json/aws_infra.json
 {
   "annotations": { "list": [] },
   "editable": true,
-  "fiscalYearStartMonth": 0,
   "grafanaVersion": "10.0.0",
-  "hideControls": false,
-  "id": null,
-  "links": [],
-  "liveNow": false,
   "name": "AWS Infrastructure & Monitoring Dashboard",
   "panels": [
     {
@@ -608,8 +580,6 @@ cat << 'EOT' > /etc/grafana/provisioning/dashboards/json/aws_infra.json
   "style": "dark",
   "tags": ["aws", "devops"],
   "time": { "from": "now-1h", "to": "now" },
-  "timepicker": {},
-  "timezone": "",
   "title": "AWS Infrastructure & Monitoring Dashboard",
   "version": 1
 }
@@ -623,7 +593,66 @@ INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
 REGION=$(curl -s http://169.254.169.254/latest/meta-data/placement/region)
 echo "0 0 * * * root aws ec2 stop-instances --instance-ids $INSTANCE_ID --region $REGION" > /etc/cron.d/daily-shutdown
 chmod 644 /etc/cron.d/daily-shutdown
-log "Prometheus, Loki, Promtail and Grafana provisioning complete!"
+log "Prometheus, Loki, Grafana Alloy and Grafana provisioning complete!"
+EOF
+}
+
+generate_user_data_stress() {
+    local PROM_IP="$1"
+    cat << EOF > user-data-stress.sh
+#!/bin/bash
+set -x
+exec > >(tee /var/log/user-data.log|logger) 2>&1
+
+log() { echo "[User-Data] \$1"; }
+
+PROMETHEUS_IP="$PROM_IP"
+LOKI_IP="$PROM_IP"
+
+log "Setting hostname to stress-node..."
+echo "stress-node" > /etc/hostname
+hostname stress-node
+
+apt-get update -y && apt-get upgrade -y
+apt-get install -y zip unzip stress stress-ng python3 python3-venv python3-pip git
+
+log "Setting up Titan App as a Service with Flask..."
+mkdir -p /opt/titan && cd /opt/titan
+git clone https://github.com/hkhcoder/vprofile-project.git /tmp/project
+cd /tmp/project && git checkout monitoring
+mv titan/* /opt/titan/
+
+# FIXED: Change directory back to /opt/titan so venv is created in the correct path
+cd /opt/titan
+python3 -m venv venv
+source venv/bin/activate
+pip install --upgrade pip
+pip install flask
+if [ -f "requirments.txt" ]; then
+    pip install -r requirments.txt
+fi
+chmod +x app.py
+
+mkdir -p /var/log/titan
+chown www-data:www-data /var/log/titan
+
+cat <<TITANSERVICE > /etc/systemd/system/titan.service
+[Unit]
+Description=Titan App Service
+After=network.target
+[Service]
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/titan
+Environment="PATH=/opt/titan/venv/bin"
+ExecStart=/opt/titan/venv/bin/python3 /opt/titan/app.py
+Restart=always
+[Install]
+WantedBy=multi-user.target
+TITANSERVICE
+
+systemctl daemon-reload
+systemctl enable --now titan
 EOF
 }
 
@@ -633,7 +662,6 @@ provision() {
     SG_ID=$(create_security_group)
     setup_iam_profile
 
-    # Solo configuramos recursos globales si se provisiona todo o explícitamente jenkins
     if [ "$TARGET_SERVER" == "all" ] || [ "$TARGET_SERVER" == "jenkins" ]; then
         create_jenkins_iam_user
         setup_ecr_repository
@@ -647,7 +675,6 @@ provision() {
     log "Waiting 10 seconds for IAM profile propagation..."
     sleep 10
 
-    # Provision Jenkins Server
     if [ "$TARGET_SERVER" == "all" ] || [ "$TARGET_SERVER" == "jenkins" ]; then
         generate_user_data_jenkins
         log "Launching Instance: Jenkins Server ($INSTANCE_TYPE_HEAVY)..."
@@ -664,7 +691,6 @@ provision() {
         log "Jenkins Instance ID: $ID_JENKINS"
     fi
 
-    # Provision SonarQube Server
     if [ "$TARGET_SERVER" == "all" ] || [ "$TARGET_SERVER" == "sonarqube" ]; then
         generate_user_data_sonarqube
         log "Launching Instance: SonarQube Server ($INSTANCE_TYPE_HEAVY)..."
@@ -681,10 +707,9 @@ provision() {
         log "SonarQube Instance ID: $ID_SQ"
     fi
 
-    # Provision Prometheus & Grafana Server
     if [ "$TARGET_SERVER" == "all" ] || [ "$TARGET_SERVER" == "prometheus" ]; then
         generate_user_data_prometheus_grafana
-        log "Launching Instance: Prometheus & Grafana Server ($INSTANCE_TYPE_LIGHT)..."
+        log "Launching Instance: Prometheus & Grafana Server with Alloy ($INSTANCE_TYPE_LIGHT)..."
         ID_PROM_GRAFANA=$(aws ec2 run-instances \
             --image-id "$AMI_ID" \
             --count 1 \
@@ -696,6 +721,25 @@ provision() {
             --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=$TAG_NAME_PROM_GRAFANA}]" \
             --query 'Instances[0].InstanceId' --output text --region "$AWS_REGION" --profile "$AWS_CLI_PROFILE")
         log "Prometheus & Grafana Instance ID: $ID_PROM_GRAFANA"
+
+        log "Waiting for Prometheus-Grafana instance to be running to fetch its private IP..."
+        aws ec2 wait instance-running --instance-ids "$ID_PROM_GRAFANA" --region "$AWS_REGION" --profile "$AWS_CLI_PROFILE"
+        PROM_GRAFANA_IP=$(aws ec2 describe-instances --instance-ids "$ID_PROM_GRAFANA" --region "$AWS_REGION" --profile "$AWS_CLI_PROFILE" --query "Reservations[0].Instances[0].PrivateIpAddress" --output text)
+        log "Prometheus-Grafana Private IP resolved to: $PROM_GRAFANA_IP"
+
+        generate_user_data_stress "$PROM_GRAFANA_IP"
+        log "Launching Conditional Instance: Stress Micro Server ($INSTANCE_TYPE_LIGHT)..."
+        ID_STRESS=$(aws ec2 run-instances \
+            --image-id "$AMI_ID" \
+            --count 1 \
+            --instance-type "$INSTANCE_TYPE_LIGHT" \
+            --security-group-ids "$SG_ID" \
+            --iam-instance-profile "Name=$PROFILE_NAME" \
+            --user-data file://user-data-stress.sh \
+            --block-device-mappings '[{"DeviceName":"/dev/sda1","Ebs":{"VolumeSize":10,"VolumeType":"gp3"}}]' \
+            --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=$TAG_NAME_STRESS}]" \
+            --query 'Instances[0].InstanceId' --output text --region "$AWS_REGION" --profile "$AWS_CLI_PROFILE")
+        log "Stress Instance ID: $ID_STRESS"
     fi
 
     log "Successfully provisioned requested resources!"
@@ -705,34 +749,58 @@ teardown() {
     local TARGET_SERVER="${1:-all}"
     verify_aws_auth
 
-    # Teardown individual EC2 instance if requested
     if [ "$TARGET_SERVER" != "all" ]; then
-        local TAG_TO_KILL=""
         case "$TARGET_SERVER" in
-            jenkins) TAG_TO_KILL="$TAG_NAME_JENKINS" ;;
-            sonarqube) TAG_TO_KILL="$TAG_NAME_SONARQUBE" ;;
-            prometheus) TAG_TO_KILL="$TAG_NAME_PROM_GRAFANA" ;;
+            jenkins)
+                TAG_TO_KILL="$TAG_NAME_JENKINS"
+                log "Locating instance with tag $TAG_TO_KILL..."
+                INSTANCE_ID=$(aws ec2 describe-instances \
+                    --filters "Name=tag:Name,Values=$TAG_TO_KILL" "Name=instance-state-name,Values=pending,running,stopped,stopping" \
+                    --query "Reservations[*].Instances[*].InstanceId" --output text --region "$AWS_REGION" --profile "$AWS_CLI_PROFILE" 2>/dev/null || true)
+
+                if [ -n "$INSTANCE_ID" ] && [ "$INSTANCE_ID" != "None" ]; then
+                    log "Terminating instance $INSTANCE_ID ($TAG_TO_KILL)..."
+                    aws ec2 terminate-instances --instance-ids "$INSTANCE_ID" --region "$AWS_REGION" --profile "$AWS_CLI_PROFILE" >/dev/null
+                    log "Instance $INSTANCE_ID successfully terminated."
+                else
+                    log "No running instance found for $TAG_TO_KILL."
+                fi
+                ;;
+            sonarqube)
+                TAG_TO_KILL="$TAG_NAME_SONARQUBE"
+                log "Locating instance with tag $TAG_TO_KILL..."
+                INSTANCE_ID=$(aws ec2 describe-instances \
+                    --filters "Name=tag:Name,Values=$TAG_TO_KILL" "Name=instance-state-name,Values=pending,running,stopped,stopping" \
+                    --query "Reservations[*].Instances[*].InstanceId" --output text --region "$AWS_REGION" --profile "$AWS_CLI_PROFILE" 2>/dev/null || true)
+
+                if [ -n "$INSTANCE_ID" ] && [ "$INSTANCE_ID" != "None" ]; then
+                    log "Terminating instance $INSTANCE_ID ($TAG_TO_KILL)..."
+                    aws ec2 terminate-instances --instance-ids "$INSTANCE_ID" --region "$AWS_REGION" --profile "$AWS_CLI_PROFILE" >/dev/null
+                    log "Instance $INSTANCE_ID successfully terminated."
+                else
+                    log "No running instance found for $TAG_TO_KILL."
+                fi
+                ;;
+            prometheus)
+                log "Terminating Prometheus-Grafana and Stress instances..."
+                for TAG in "$TAG_NAME_PROM_GRAFANA" "$TAG_NAME_STRESS"; do
+                    INSTANCE_ID=$(aws ec2 describe-instances \
+                        --filters "Name=tag:Name,Values=$TAG" "Name=instance-state-name,Values=pending,running,stopped,stopping" \
+                        --query "Reservations[*].Instances[*].InstanceId" --output text --region "$AWS_REGION" --profile "$AWS_CLI_PROFILE" 2>/dev/null || true)
+
+                    if [ -n "$INSTANCE_ID" ] && [ "$INSTANCE_ID" != "None" ]; then
+                        log "Terminating instance $INSTANCE_ID ($TAG)..."
+                        aws ec2 terminate-instances --instance-ids "$INSTANCE_ID" --region "$AWS_REGION" --profile "$AWS_CLI_PROFILE" >/dev/null
+                    fi
+                done
+                ;;
             *) log "Unknown server target: $TARGET_SERVER"; exit 1 ;;
         esac
-
-        log "Locating instance with tag $TAG_TO_KILL..."
-        INSTANCE_ID=$(aws ec2 describe-instances \
-            --filters "Name=tag:Name,Values=$TAG_TO_KILL" "Name=instance-state-name,Values=pending,running,stopped,stopping" \
-            --query "Reservations[*].Instances[*].InstanceId" --output text --region "$AWS_REGION" --profile "$AWS_CLI_PROFILE" 2>/dev/null || true)
-
-        if [ -n "$INSTANCE_ID" ] && [ "$INSTANCE_ID" != "None" ]; then
-            log "Terminating instance $INSTANCE_ID ($TAG_TO_KILL)..."
-            aws ec2 terminate-instances --instance-ids "$INSTANCE_ID" --region "$AWS_REGION" --profile "$AWS_CLI_PROFILE" >/dev/null
-            log "Instance $INSTANCE_ID successfully terminated."
-        else
-            log "No running instance found for $TAG_TO_KILL."
-        fi
         return 0
     fi
 
-    # Full Teardown
     log "Locating and terminating all instances..."
-    for TAG in "$TAG_NAME_JENKINS" "$TAG_NAME_SONARQUBE" "$TAG_NAME_PROM_GRAFANA"; do
+    for TAG in "$TAG_NAME_JENKINS" "$TAG_NAME_SONARQUBE" "$TAG_NAME_PROM_GRAFANA" "$TAG_NAME_STRESS"; do
         INSTANCE_ID=$(aws ec2 describe-instances \
             --filters "Name=tag:Name,Values=$TAG" "Name=instance-state-name,Values=pending,running,stopped,stopping" \
             --query "Reservations[*].Instances[*].InstanceId" --output text --region "$AWS_REGION" --profile "$AWS_CLI_PROFILE" 2>/dev/null || true)
